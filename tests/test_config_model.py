@@ -151,6 +151,13 @@ def test_intervals_enabled_for_online_rl(tree):
     assert tree.field_enabled("online_rl", "intervals_count")
 
 
+@pytest.mark.parametrize("paradigm", ["offline_rl", "supervised"])
+def test_intervals_disabled_without_progressive_slicing(tree, paradigm):
+    """validation.py reads allows_intervals with a default of False, so a
+    paradigm that stays silent forbids intervals_count > 1."""
+    assert not tree.field_enabled(paradigm, "intervals_count")
+
+
 def test_disabled_field_explains_itself(tree):
     reason = tree.paradigms["offline_rl"].disabled_reason("eval_episodes")
     assert reason and "eval_episodes" in reason

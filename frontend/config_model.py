@@ -148,8 +148,10 @@ class Paradigm:
         if name in self.forbids:
             return False
         flag = _ALLOW_FLAGS.get(name)
-        if flag is not None and flag in self.raw:
-            return bool(self.raw[flag])
+        if flag is not None:
+            # These are opt-in: validation.py reads paradigm_def.get(flag, False),
+            # so a paradigm that does not declare the flag forbids the field.
+            return bool(self.raw.get(flag, False))
         return True
 
     def disabled_reason(self, name: str) -> str | None:
