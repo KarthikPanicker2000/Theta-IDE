@@ -1,8 +1,8 @@
 """Vertical tab bar with themed SVG icons: a drop-in for the subset of QTabWidget the window uses."""
 from pathlib import Path
 
-from PyQt6.QtCore import QByteArray, QMimeData, QPoint, QRectF, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QDrag, QIcon, QPainter, QPen, QPixmap
+from PyQt6.QtCore import QByteArray, QEvent, QMimeData, QPoint, QRectF, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QCursor, QDrag, QIcon, QPainter, QPen, QPixmap
 from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QSizePolicy, QStackedWidget, QToolButton,
                              QVBoxLayout, QWidget)
@@ -11,6 +11,8 @@ from .theme import theme_color
 
 ICON_DIR = Path(__file__).resolve().parent / "icons"
 ICON_SIZE = 20
+AUTO_HIDE_EDGE = 6  # px strip left visible while the bar is tucked away
+AUTO_HIDE_DELAY_MS = 350
 
 
 def svg_icon(name, colors):
@@ -189,6 +191,7 @@ class SideTabs(QWidget):
     logoClicked = pyqtSignal()
     tabOrderChanged = pyqtSignal(list)
     tabVisibilityChanged = pyqtSignal(str, bool)
+    autoHideChanged = pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -215,7 +218,23 @@ class SideTabs(QWidget):
         self.set_logo_icon()
         self.bar_layout.addWidget(self.logo_button)
 
+        # Auto-hide: the bar leaves the layout and floats over the pages; this strip reveals it on hover
+        self.auto_hide = False
+        self.edge = QWidget(self)
+        self.edge.setObjectName("sideTabsEdge")
+        self.edge.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.edge.setFixedWidth(AUTO_HIDE_EDGE)
+        self.edge.setToolTip("Hover to show the sidebar")
+        self.edge.hide()
+        self._hide_timer = QTimer(self)
+        self._hide_timer.setSingleShot(True)
+        self._hide_timer.setInterval(AUTO_HIDE_DELAY_MS)
+        self._hide_timer.timeout.connect(self._tuck_bar)
+        self.edge.installEventFilter(self)
+        self.bar.installEventFilter(self)
+
         self.stack = QStackedWidget()
+        layout.addWidget(self.edge)
         layout.addWidget(self.bar)
         layout.addWidget(self.stack, 1)
 
@@ -381,6 +400,53 @@ class SideTabs(QWidget):
             if item["icon"]:
                 item["button"].setIcon(svg_icon(item["icon"], TAB_ICON_COLORS))
         self.set_logo_icon()
+
+    # ── Auto-hide ────────────────────────────────────────────────────────────
+
+    def set_auto_hide(self, enabled):
+        """Collapse the bar to a thin edge that slides it back out on hover, or dock it again."""
+        enabled = bool(enabled)
+        if enabled == self.auto_hide:
+            return
+        self.auto_hide = enabled
+        self._hide_timer.stop()
+        if enabled:
+            self.layout().removeWidget(self.bar)
+            self.bar.hide()
+            self.edge.show()
+        else:
+            self.edge.hide()
+            self.layout().insertWidget(1, self.bar)
+            self.bar.show()
+        self.autoHideChanged.emit(enabled)
+
+    def _reveal_bar(self):
+        self._hide_timer.stop()
+        width = max(self.bar.minimumWidth(), self.bar.sizeHint().width())
+        self.bar.setGeometry(0, 0, width, self.height())
+        self.bar.show()
+        self.bar.raise_()
+
+    def _tuck_bar(self):
+        # Stay open while the pointer is still over the bar (e.g. coming back from a tooltip)
+        if self.auto_hide and not self.bar.rect().contains(self.bar.mapFromGlobal(QCursor.pos())):
+            self.bar.hide()
+
+    def eventFilter(self, obj, event):
+        if self.auto_hide:
+            kind = event.type()
+            if obj is self.edge and kind == QEvent.Type.Enter:
+                self._reveal_bar()
+            elif obj is self.bar and kind == QEvent.Type.Enter:
+                self._hide_timer.stop()
+            elif obj is self.bar and kind == QEvent.Type.Leave:
+                self._hide_timer.start()
+        return super().eventFilter(obj, event)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self.auto_hide and self.bar.isVisible():
+            self.bar.setGeometry(0, 0, self.bar.width(), self.height())
 
     # ── QTabWidget-compatible API ────────────────────────────────────────────
 

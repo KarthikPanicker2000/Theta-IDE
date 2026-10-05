@@ -122,6 +122,9 @@ class Window(QMainWindow):
         self.init_default_experiment()
         self.tabs.tabOrderChanged.connect(lambda _: self.save_layout())
         self.load_layout()
+        if hasattr(self, "settings_manager"):
+            self.tabs.set_auto_hide(bool(self.settings_manager.get("sidebar", "auto_hide", default=False)))
+        self.tabs.autoHideChanged.connect(self.on_sidebar_auto_hide_changed)
         self.make_menus()
         self.theme_status = label("", "muted")
         self.statusBar().addWidget(self.theme_status)
@@ -591,6 +594,23 @@ class Window(QMainWindow):
 
         sb_layout.addLayout(panes_grid)
 
+        auto_hide_row = QHBoxLayout()
+        auto_hide_info = QVBoxLayout()
+        auto_hide_info.setSpacing(1)
+        auto_hide_title = label("Auto-hide sidebar")
+        auto_hide_title.setStyleSheet("font-weight: 600;")
+        auto_hide_info.addWidget(auto_hide_title)
+        auto_hide_info.addWidget(label("Tuck the sidebar into a thin left edge; hover the edge to slide it out", "muted"))
+        auto_hide_row.addLayout(auto_hide_info, 1)
+        auto_hide_on = hasattr(self, "settings_manager") and bool(
+            self.settings_manager.get("sidebar", "auto_hide", default=False))
+        self.auto_hide_slider = ToggleSlider(checked=auto_hide_on)
+        self.auto_hide_slider.setToolTip("Hide the sidebar until you hover the left edge")
+        self.auto_hide_slider.setAccessibleName("Toggle sidebar auto-hide")
+        self.auto_hide_slider.toggled.connect(lambda on: self.tabs.set_auto_hide(on))
+        auto_hide_row.addWidget(self.auto_hide_slider)
+        sb_layout.addLayout(auto_hide_row)
+
         sb_btn_row = QHBoxLayout()
         btn_reset_sidebar = QPushButton("Restore default sidebar")
         btn_reset_sidebar.setToolTip("Show all panels and restore original sidebar order")
@@ -861,6 +881,18 @@ class Window(QMainWindow):
                 return self.hotkey_manager.switch_to_pane_by_index(target)
             return self.hotkey_manager.switch_to_pane(str(target))
         return False
+
+    def on_sidebar_auto_hide_changed(self, enabled):
+        """Keep the menu item and the Settings switch in step, and remember the choice."""
+        for control in (getattr(self, "auto_hide_action", None), getattr(self, "auto_hide_slider", None)):
+            if control is not None and control.isChecked() != enabled:
+                control.blockSignals(True)
+                control.setChecked(enabled)
+                control.blockSignals(False)
+        if hasattr(self, "settings_manager"):
+            self.settings_manager.set("sidebar", "auto_hide", enabled)
+        self.statusBar().showMessage(
+            "Sidebar auto-hide on: hover the left edge to show it." if enabled else "Sidebar docked.", 4000)
 
     def on_pane_slider_toggled(self, pane_id, checked):
         visible_count = sum(1 for s in self.pane_sliders.values() if s.isChecked())
@@ -1200,6 +1232,10 @@ class Window(QMainWindow):
         view_menu.addAction("Console", lambda: self.tabs.setCurrentWidget(self.console_panel))
         view_menu.addAction("Settings & About", lambda: self.tabs.setCurrentWidget(self.settings_panel))
         view_menu.addAction("Restore default layout", lambda: self.restoreState(self.default_layout))
+        self.auto_hide_action = QAction("Auto-hide sidebar", self, checkable=True)
+        self.auto_hide_action.setChecked(self.tabs.auto_hide)
+        self.auto_hide_action.toggled.connect(lambda on: self.tabs.set_auto_hide(on))
+        view_menu.addAction(self.auto_hide_action)
         view_menu.addSeparator()
         view_menu.addAction("Preferences: Open Settings File", self.open_settings_file)
         help_menu = self.menuBar().addMenu("Help")
