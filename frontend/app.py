@@ -22,11 +22,13 @@ from PyQt6.QtWidgets import (
     QFrame, QToolButton, QSlider, QStyle, QLabel,
 )
 from .api import DEFAULT_URL, Backend
+from .app_icon import DESKTOP_FILE_NAME, ICON_PATH, app_icon, install_desktop_entry, set_windows_app_id
 from .model import (BASE_EXPERIMENT, FINAL_STATUSES, LIVE_STATUSES, Config, Store, available_metrics, example_runs,
                     latest, metric_points, new_run, sample)
 from .settings import SettingsManager
 from .theme import STYLE, ThemeManager, theme_color
 from .theme_builder import ThemeBuilder
+from .titlebar import apply_title_bar
 from .widgets import Chart, MetricCard, ToggleSlider, YamlHighlighter, label
 from .about import AboutDialog, AsciiTheta
 from .config_tree import ConfigTreeWidget
@@ -1245,6 +1247,12 @@ class Window(QMainWindow):
             self.test_backend_connection()
         if hasattr(self, "terminal_panel"):
             self.terminal_panel.apply_theme(self.theme_manager.active)
+        if self.isVisible():  # before the first show, showEvent colours the title bar
+            apply_title_bar(self, self.theme_manager.active["colors"])
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        apply_title_bar(self, self.theme_manager.active["colors"])  # the native window exists once shown
 
     def populate_themes_menu(self):
         self.themes_menu.clear()
@@ -2217,7 +2225,14 @@ def main():
     parser.add_argument("--data-dir", type=Path, default=Path(__file__).resolve().parent.parent / ".thetaide" / "runs")
     parser.add_argument("--api-url", default=os.environ.get("THETAIDE_API_URL", DEFAULT_URL),
                         help="NeSyRL backend API (default: %(default)s)")
+    parser.add_argument("--install-desktop-entry", action="store_true",
+                        help="Linux: add ThetaIDE (with its icon) to the application menu and exit")
     args = parser.parse_args()
+    if args.install_desktop_entry:
+        entry, icon = install_desktop_entry()
+        print(f"Installed {entry}\nInstalled {icon}")
+        return 0
+    set_windows_app_id()  # before any window: the taskbar then shows ThetaIDE's icon, not python.exe's
     if sys.platform == "darwin":
         try:
             import ctypes
@@ -2230,7 +2245,7 @@ def main():
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
     QApplication.setApplicationName("ThetaIDE")
     QApplication.setApplicationDisplayName("ThetaIDE")
-    QApplication.setDesktopFileName("ThetaIDE")
+    QApplication.setDesktopFileName(DESKTOP_FILE_NAME)
     QApplication.setOrganizationName("ThetaIDE")
     QApplication.setOrganizationDomain("thetaide.org")
 
@@ -2241,9 +2256,8 @@ def main():
     app.setFont(QFont("Segoe UI", 10))
     app.setStyleSheet(STYLE)
 
-    icon_path = Path(__file__).resolve().parent / "icons" / "theta_app_icon.svg"
-    if icon_path.is_file():
-        app.setWindowIcon(QIcon(str(icon_path)))
+    if ICON_PATH.is_file():
+        app.setWindowIcon(app_icon())  # every window's title bar, the taskbar and (macOS) the Dock
 
     try:
         window = Window(args.data_dir, args.api_url)
