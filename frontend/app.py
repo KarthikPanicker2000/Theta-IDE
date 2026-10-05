@@ -2032,6 +2032,9 @@ class Window(QMainWindow):
             for col, value in enumerate((name, str(config["seed"]), run["status"], reward, source)):
                 cell = QTableWidgetItem(value)
                 cell.setData(Qt.ItemDataRole.UserRole, run["id"])
+                # Experiment names read best left-aligned; every other value sits centered under its label.
+                cell.setTextAlignment((Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter) if col == 0
+                                      else Qt.AlignmentFlag.AlignCenter)
                 self.table.setItem(row, col, cell)
         self.table.blockSignals(False)
 
