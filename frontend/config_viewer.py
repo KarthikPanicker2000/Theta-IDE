@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .config_model import ConfigTree
-from .widgets import label
+from .widgets import ComboBox, DoubleSpinBox, SpinBox, label
 
 _CONFIG_TREE = None
 _CONFIG_TREE_LOADED = False
@@ -263,7 +263,7 @@ class ConfigViewer(QWidget):
         # Paradigm + Environment, driven by in/config/paradigms constraints.
         tree = config_tree()
         if tree and tree.paradigms:
-            self.combo_paradigm = QComboBox()
+            self.combo_paradigm = ComboBox()
             self.combo_paradigm.addItems(sorted(tree.paradigms))
             if paradigm in tree.paradigms:
                 self.combo_paradigm.setCurrentText(paradigm)
@@ -274,7 +274,7 @@ class ConfigViewer(QWidget):
             form_id.addRow("Paradigm", self.combo_paradigm)
             self.field_widgets["paradigm"] = self.combo_paradigm
 
-            self.combo_env = QComboBox()
+            self.combo_env = ComboBox()
             # Name what is inherited: "(inherit from base)" alone leaves the user
             # with no way to tell which environment the run will actually use.
             # The sentinel lives in the item's data, so the visible label is free
@@ -316,7 +316,7 @@ class ConfigViewer(QWidget):
 
         # Total timesteps
         form_budget.addWidget(label("Total Timesteps"), 0, 0)
-        self.spin_timesteps = QSpinBox()
+        self.spin_timesteps = SpinBox()
         self.spin_timesteps.setRange(100, 100_000_000)
         self.spin_timesteps.setSingleStep(1_000)
         self.spin_timesteps.setValue(int(data.get("total_timesteps") or 10000))
@@ -328,7 +328,7 @@ class ConfigViewer(QWidget):
         form_budget.addWidget(label("Random Seed"), 0, 2)
         seed_row = QHBoxLayout()
         seed_row.setSpacing(6)
-        self.spin_seed = QSpinBox()
+        self.spin_seed = SpinBox()
         self.spin_seed.setRange(0, 2147483647)
         self.spin_seed.setValue(int(data.get("seed") if data.get("seed") is not None else 42))
         self.spin_seed.valueChanged.connect(lambda v: self._on_field_edited("seed", v))
@@ -344,7 +344,7 @@ class ConfigViewer(QWidget):
 
         # Intervals count
         form_budget.addWidget(label("Intervals Count"), 1, 0)
-        self.spin_intervals = QSpinBox()
+        self.spin_intervals = SpinBox()
         self.spin_intervals.setRange(1, 100)
         self.spin_intervals.setValue(int(data.get("intervals_count") or 4))
         self.spin_intervals.valueChanged.connect(lambda v: self._on_field_edited("intervals_count", v))
@@ -353,7 +353,7 @@ class ConfigViewer(QWidget):
 
         # Eval episodes
         form_budget.addWidget(label("Eval Episodes"), 1, 2)
-        self.spin_eval_ep = QSpinBox()
+        self.spin_eval_ep = SpinBox()
         self.spin_eval_ep.setRange(0, 1000)
         self.spin_eval_ep.setValue(int(data.get("eval_episodes") if data.get("eval_episodes") is not None else 100))
         self.spin_eval_ep.valueChanged.connect(lambda v: self._on_field_edited("eval_episodes", v))
@@ -444,7 +444,7 @@ class ConfigViewer(QWidget):
                 agent_val = str(m_spec.get("agent", ""))
                 if tree and tree.paradigms.get(paradigm):
                     permitted = [a.name for a in tree.agents_for(paradigm)]
-                    txt_agent = QComboBox()
+                    txt_agent = ComboBox()
                     txt_agent.addItems(permitted)
                     if agent_val and agent_val not in permitted:
                         # Never silently rewrite what is already on disk.
@@ -473,7 +473,7 @@ class ConfigViewer(QWidget):
                 else:
                     model_str = str(model_val)
                 if tree and tree.models and not isinstance(model_val, dict):
-                    txt_model = QComboBox()
+                    txt_model = ComboBox()
                     known = sorted(tree.models)
                     txt_model.addItems(known)
                     if model_str and model_str not in known:
@@ -492,7 +492,7 @@ class ConfigViewer(QWidget):
 
                 # Learning rate
                 if "lr" in m_spec:
-                    spin_lr = QDoubleSpinBox()
+                    spin_lr = DoubleSpinBox()
                     spin_lr.setDecimals(6)
                     spin_lr.setRange(0.000001, 1.0)
                     spin_lr.setSingleStep(0.0001)
@@ -502,7 +502,7 @@ class ConfigViewer(QWidget):
 
                 # Batch size
                 if "batch_size" in m_spec:
-                    spin_bs = QSpinBox()
+                    spin_bs = SpinBox()
                     spin_bs.setRange(1, 131072)
                     spin_bs.setValue(int(m_spec["batch_size"]))
                     spin_bs.valueChanged.connect(lambda v, mn=m_name: self._on_method_param_edited(mn, "batch_size", v))
@@ -510,7 +510,7 @@ class ConfigViewer(QWidget):
 
                 # Gamma
                 if "gamma" in m_spec:
-                    spin_g = QDoubleSpinBox()
+                    spin_g = DoubleSpinBox()
                     spin_g.setDecimals(4)
                     spin_g.setRange(0.0, 1.0)
                     spin_g.setValue(float(m_spec["gamma"]))
@@ -542,14 +542,14 @@ class ConfigViewer(QWidget):
         env_cfg = data.get("env", {})
         if isinstance(env_cfg, dict):
             grid_et.addWidget(label("Parallel Envs (num_envs)"), 0, 0)
-            spin_num_envs = QSpinBox()
+            spin_num_envs = SpinBox()
             spin_num_envs.setRange(1, 1024)
             spin_num_envs.setValue(int(env_cfg.get("num_envs") or 4))
             spin_num_envs.valueChanged.connect(lambda v: self._on_nested_edited("env", "num_envs", v))
             grid_et.addWidget(spin_num_envs, 0, 1)
 
             grid_et.addWidget(label("Steps per Env (num_steps)"), 0, 2)
-            spin_num_steps = QSpinBox()
+            spin_num_steps = SpinBox()
             spin_num_steps.setRange(1, 100000)
             spin_num_steps.setValue(int(env_cfg.get("num_steps") or 128))
             spin_num_steps.valueChanged.connect(lambda v: self._on_nested_edited("env", "num_steps", v))
@@ -558,14 +558,14 @@ class ConfigViewer(QWidget):
         trainer_cfg = data.get("trainer", {})
         if isinstance(trainer_cfg, dict):
             grid_et.addWidget(label("Accelerator"), 1, 0)
-            combo_accel = QComboBox()
+            combo_accel = ComboBox()
             combo_accel.addItems(["cpu", "gpu", "mps", "auto"])
             combo_accel.setCurrentText(str(trainer_cfg.get("accelerator") or "cpu"))
             combo_accel.currentTextChanged.connect(lambda v: self._on_nested_edited("trainer", "accelerator", v))
             grid_et.addWidget(combo_accel, 1, 1)
 
             grid_et.addWidget(label("Max Epochs"), 1, 2)
-            spin_epochs = QSpinBox()
+            spin_epochs = SpinBox()
             spin_epochs.setRange(1, 1000)
             spin_epochs.setValue(int(trainer_cfg.get("max_epochs") or 1))
             spin_epochs.valueChanged.connect(lambda v: self._on_nested_edited("trainer", "max_epochs", v))
@@ -623,7 +623,7 @@ class ConfigViewer(QWidget):
                     chk.toggled.connect(lambda val, key=k: self._on_field_edited(key, val))
                     form.addRow(k, chk)
                 elif isinstance(v, (int, float)):
-                    spin = QDoubleSpinBox() if isinstance(v, float) else QSpinBox()
+                    spin = DoubleSpinBox() if isinstance(v, float) else SpinBox()
                     spin.setRange(-1000000, 100000000)
                     if isinstance(v, float):
                         spin.setDecimals(6)

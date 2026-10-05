@@ -296,5 +296,72 @@ class TestTreeToolbar(unittest.TestCase):
         self.assertEqual(self.widget.layout().itemAt(0).widget().text(), "EXPERIMENTS")
 
 
+@unittest.skipIf(not HAS_PYQT6, "PyQt6 not installed in current environment")
+class TestScrollDoesNotEditFields(unittest.TestCase):
+    """Qt gives these widgets WheelFocus, so scrolling a long form used to
+    rewrite every field the pointer crossed."""
+
+    def setUp(self):
+        from pathlib import Path
+
+        from PyQt6.QtCore import Qt
+
+        self.Qt = Qt
+        self.viewer = ConfigViewer()
+        self.addCleanup(self.viewer.close)
+        self.viewer.load_file(
+            Path("in/config/experiment/cartpole/blending.yaml"), "experiment/cartpole/blending.yaml"
+        )
+        self.viewer.show()
+        QApplication.processEvents()
+
+    def wheel(self, widget):
+        from PyQt6.QtCore import QPoint, QPointF
+        from PyQt6.QtGui import QWheelEvent
+
+        event = QWheelEvent(
+            QPointF(5, 5), QPointF(5, 5), QPoint(0, -120), QPoint(0, -120),
+            self.Qt.MouseButton.NoButton, self.Qt.KeyboardModifier.NoModifier,
+            self.Qt.ScrollPhase.NoScrollPhase, False,
+        )
+        QApplication.sendEvent(widget, event)
+        return event.isAccepted()
+
+    def test_scrolling_an_unfocused_field_leaves_it_alone(self):
+        box = self.viewer.spin_timesteps
+        box.clearFocus()
+        QApplication.processEvents()
+        before = box.value()
+        self.wheel(box)
+        self.assertEqual(box.value(), before)
+
+    def test_unfocused_wheel_is_left_for_the_scroll_area(self):
+        box = self.viewer.spin_timesteps
+        box.clearFocus()
+        QApplication.processEvents()
+        self.assertFalse(self.wheel(box), "the field swallowed the wheel event")
+
+    def test_scrolling_a_focused_field_still_edits_it(self):
+        box = self.viewer.spin_timesteps
+        box.setFocus(self.Qt.FocusReason.MouseFocusReason)
+        QApplication.processEvents()
+        before = box.value()
+        self.wheel(box)
+        self.assertNotEqual(box.value(), before)
+
+    def test_combo_boxes_behave_the_same(self):
+        combo = self.viewer.combo_paradigm
+        combo.clearFocus()
+        QApplication.processEvents()
+        before = combo.currentText()
+        self.wheel(combo)
+        self.assertEqual(combo.currentText(), before)
+
+    def test_fields_do_not_take_focus_from_a_passing_wheel(self):
+        for name in ("spin_timesteps", "spin_seed", "combo_paradigm"):
+            widget = getattr(self.viewer, name)
+            self.assertEqual(widget.focusPolicy(), self.Qt.FocusPolicy.StrongFocus, name)
+
+
 if __name__ == "__main__":
     unittest.main()

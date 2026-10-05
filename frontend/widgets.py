@@ -2,8 +2,43 @@ import math
 import re
 from PyQt6.QtCore import Qt, QRectF, QSize
 from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen, QFont, QSyntaxHighlighter, QTextCharFormat, QLinearGradient
-from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QFrame, QAbstractButton
+from PyQt6.QtWidgets import (
+    QWidget, QLabel, QVBoxLayout, QFrame, QAbstractButton,
+    QComboBox, QDoubleSpinBox, QSpinBox,
+)
 from .theme import theme_color
+
+
+class _WheelNeedsFocus:
+    """Only edit the value when the widget has been clicked into.
+
+    Qt gives spin boxes and combo boxes WheelFocus by default, so they take
+    focus from a passing wheel event and then consume it. Scrolling a long form
+    silently rewrites every field the pointer crosses. Ignoring the event
+    instead lets it reach the scroll area, which is what the user meant.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+    def wheelEvent(self, event):
+        if self.hasFocus():
+            super().wheelEvent(event)
+        else:
+            event.ignore()
+
+
+class SpinBox(_WheelNeedsFocus, QSpinBox):
+    pass
+
+
+class DoubleSpinBox(_WheelNeedsFocus, QDoubleSpinBox):
+    pass
+
+
+class ComboBox(_WheelNeedsFocus, QComboBox):
+    pass
 
 
 def label(text, kind=None, wrap=False):
