@@ -4,6 +4,10 @@ from pathlib import Path
 import yaml
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -20,6 +24,88 @@ from PyQt6.QtWidgets import (
 
 from .config_model import ConfigTree, experiment_yaml, group_base_yaml
 from .widgets import label
+
+
+class NewExperimentDialog(QDialog):
+    """Group, name, and - only for a group that does not exist yet - the paradigm
+    and environment its _base.yaml will bind.
+
+    One form rather than a chain of prompts, so the paradigm and environment
+    rows can appear and re-filter as the group name is typed.
+    """
+
+    def __init__(self, tree, groups, group=None, parent=None):
+        super().__init__(parent)
+        self.tree = tree
+        self.setWindowTitle("New Experiment")
+        self.setMinimumWidth(420)
+
+        form = QFormLayout()
+        form.setVerticalSpacing(10)
+
+        self.group = QComboBox()
+        self.group.setEditable(True)
+        self.group.addItems(groups)
+        if group:
+            self.group.setCurrentText(group)
+            self.group.setEnabled(False)
+        form.addRow("Group", self.group)
+
+        self.name = QLineEdit("new_experiment")
+        form.addRow("Experiment name", self.name)
+
+        self.paradigm = QComboBox()
+        self.paradigm.addItems(sorted(tree.paradigms) if tree else [])
+        form.addRow("Paradigm", self.paradigm)
+
+        self.env = QComboBox()
+        form.addRow("Environment", self.env)
+
+        self.hint = label("", "muted")
+        self.hint.setWordWrap(True)
+        form.addRow("", self.hint)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+
+        layout = QVBoxLayout(self)
+        layout.addLayout(form)
+        layout.addWidget(buttons)
+
+        self.group.currentTextChanged.connect(self._group_changed)
+        self.paradigm.currentTextChanged.connect(self._paradigm_changed)
+        self._group_changed(self.group.currentText())
+
+    def _group_changed(self, name):
+        """A known group already fixes paradigm and env; a new one must choose."""
+        known = bool(self.tree) and self.tree.group(name.strip()).has_base
+        self.paradigm.setEnabled(not known)
+        self.env.setEnabled(not known)
+        if known:
+            group = self.tree.group(name.strip())
+            self.hint.setText(f"Inherits {group.paradigm or 'defaults'} / {group.env or 'env'} from {name}/_base.yaml")
+            if group.paradigm:
+                self.paradigm.setCurrentText(group.paradigm)
+            self._paradigm_changed(self.paradigm.currentText())
+            if group.env:
+                self.env.setCurrentText(group.env)
+        else:
+            self.hint.setText(f"'{name}' is new — a _base.yaml will be written binding these.")
+            self._paradigm_changed(self.paradigm.currentText())
+
+    def _paradigm_changed(self, paradigm):
+        if not self.tree or paradigm not in self.tree.paradigms:
+            return
+        current = self.env.currentText()
+        self.env.clear()
+        self.env.addItems([e.name for e in self.tree.environments_for(paradigm)])
+        if current:
+            self.env.setCurrentText(current)
+
+    def values(self):
+        return (self.group.currentText().strip(), self.name.text().strip(),
+                self.paradigm.currentText(), self.env.currentText())
 
 
 def find_config_root():
@@ -314,53 +400,47 @@ class ConfigTreeWidget(QWidget):
         except (OSError, ValueError):
             return None
 
-    def _ensure_group_base(self, tree, group_name):
-        """Make sure the group has a _base.yaml, prompting for env and paradigm.
+    def _ensure_group_base(self, tree, group_name, paradigm, env):
+        """Write the group's _base.yaml if it has none.
 
         An experiment inherits its environment and paradigm from the group base,
         so creating one in a group without a base produces a config Hydra cannot
         even load ("Could not load 'experiment/<group>/_base'").
-
-        Returns the group's paradigm name, or None if the user cancelled.
         """
         group = tree.group(group_name)
         if group.has_base:
             return group.paradigm
-
-        paradigm, ok = QInputDialog.getItem(
-            self, "New Group", f"'{group_name}' is a new group.\nWhich paradigm do its experiments use?",
-            sorted(tree.paradigms), 0, False
-        )
-        if not ok:
-            return None
-
-        envs = [e.name for e in tree.environments_for(paradigm)]
-        if not envs:
-            QMessageBox.warning(self, "No Environments",
-                                f"No environment is compatible with '{paradigm}'.")
-            return None
-        env, ok = QInputDialog.getItem(
-            self, "New Group", f"Environment for '{group_name}' ({paradigm}):", envs, 0, False
-        )
-        if not ok:
-            return None
-
         base_dir = self.root_dir / "experiment" / group_name
         base_dir.mkdir(parents=True, exist_ok=True)
-        (base_dir / "_base.yaml").write_text(group_base_yaml(env, paradigm), encoding="utf-8")
+        base_yaml = group_base_yaml(env, paradigm, tree.paradigms.get(paradigm))
+        (base_dir / "_base.yaml").write_text(base_yaml, encoding="utf-8")
         return paradigm
 
-    def _write_experiment(self, group_name, filename, exp_id):
+    def _write_experiment(self, group_name, filename, exp_id, paradigm=None, env=None):
         """Create an experiment valid for its group's paradigm. Returns rel path or None."""
         tree = self._model()
-        paradigm_name, paradigm, agent = None, None, None
+        paradigm_obj, agent = None, None
         if tree is not None:
-            paradigm_name = self._ensure_group_base(tree, group_name)
-            if paradigm_name is None and not tree.group(group_name).has_base:
-                return None
-            paradigm = tree.paradigms.get(paradigm_name) if paradigm_name else None
+            paradigm_name = self._ensure_group_base(tree, group_name, paradigm, env)
+            paradigm_obj = tree.paradigms.get(paradigm_name) if paradigm_name else None
             permitted = [a.name for a in tree.agents_for(paradigm_name)] if paradigm_name else []
             agent = permitted[0] if permitted else None
+            if paradigm_name and not permitted:
+                # supervised currently declares allowed_agents: [], yet the same
+                # paradigm requires methods to be non-empty, so no valid
+                # experiment can be generated for it.
+                proceed = QMessageBox.question(
+                    self, "No agents for this paradigm",
+                    f"'{paradigm_name}' declares no allowed agents, so the experiment "
+                    f"will have no methods block and the pipeline will reject it:\n\n"
+                    f"    requires 'methods' to satisfy rule 'non_empty'\n\n"
+                    f"Add agents to in/config/paradigms/{paradigm_name}.yaml to fix this.\n\n"
+                    f"Create the file anyway?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,
+                )
+                if proceed != QMessageBox.StandardButton.Yes:
+                    return None
 
         target_dir = self.root_dir / "experiment" / group_name
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -369,7 +449,7 @@ class ConfigTreeWidget(QWidget):
             QMessageBox.warning(self, "File Exists", f"Experiment file already exists:\n{target_file}")
             return None
         try:
-            target_file.write_text(experiment_yaml(group_name, exp_id, paradigm, agent), encoding="utf-8")
+            target_file.write_text(experiment_yaml(group_name, exp_id, paradigm_obj, agent), encoding="utf-8")
         except OSError as exc:
             QMessageBox.critical(self, "Error Creating Experiment", f"Could not create file:\n{exc}")
             return None
@@ -383,36 +463,18 @@ class ConfigTreeWidget(QWidget):
         groups = [p.name for p in exp_dir.iterdir() if p.is_dir() and not p.name.startswith(".")]
         return sorted(groups)
 
-    def prompt_new_in_group(self):
-        """Prompt to create a new default experiment in an existing or new group."""
-        groups = self.get_available_groups()
-        if not groups:
-            groups = ["cartpole", "mimic", "thetaide"]
-
-        group, ok = QInputDialog.getItem(
-            self, "New Experiment in Group", "Select or type experiment group:",
-            groups, 0, True
-        )
-        if not ok or not group.strip():
+    def prompt_new_in_group(self, group=None):
+        """Create a new experiment, in an existing group or a brand new one."""
+        groups = self.get_available_groups() or ["cartpole", "mimic", "thetaide"]
+        dialog = NewExperimentDialog(self._model(), groups, group=group, parent=self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        group_name, name, paradigm, env = dialog.values()
+        if not group_name or not name:
             return
 
-        group = group.strip()
-        name, ok2 = QInputDialog.getText(
-            self, "New Experiment Name", f"Experiment name in group '{group}':",
-            QLineEdit.EchoMode.Normal, "new_experiment"
-        )
-        if not ok2 or not name.strip():
-            return
-
-        name = name.strip()
-        if not name.endswith(".yaml"):
-            name_file = f"{name}.yaml"
-            exp_id = name
-        else:
-            name_file = name
-            exp_id = name[:-5]
-
-        rel_path = self._write_experiment(group, name_file, exp_id)
+        filename = name if name.endswith(".yaml") else f"{name}.yaml"
+        rel_path = self._write_experiment(group_name, filename, filename[:-5], paradigm, env)
         if rel_path:
             self.populate()
             self.select_file(rel_path)
@@ -508,20 +570,7 @@ class ConfigTreeWidget(QWidget):
         self.tree.expandAll()
 
     def _create_in_specific_group(self, group_name):
-        name, ok = QInputDialog.getText(
-            self, "New Experiment", f"New experiment name in '{group_name}':",
-            QLineEdit.EchoMode.Normal, "new_experiment"
-        )
-        if not ok or not name.strip():
-            return
-        name = name.strip()
-        filename = f"{name}.yaml" if not name.endswith(".yaml") else name
-        exp_id = name.replace(".yaml", "")
-
-        rel_path = self._write_experiment(group_name, filename, exp_id)
-        if rel_path:
-            self.populate()
-            self.select_file(rel_path)
+        self.prompt_new_in_group(group=group_name)
 
     def prompt_new_component(self):
         """Prompt to create a new component configuration (agent, env, model, etc.)."""

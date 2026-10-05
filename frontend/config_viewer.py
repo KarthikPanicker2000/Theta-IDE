@@ -191,12 +191,27 @@ class ConfigViewer(QWidget):
         self.boxes_layout.addStretch()
         self._block_updates = False
 
+    def _group_name(self):
+        """The experiment group this file sits in, from experiment/<group>/<file>."""
+        parts = Path(str(self.current_rel_path or "")).parts
+        return parts[1] if len(parts) > 2 and parts[0] == "experiment" else None
+
+    def _inherited_paradigm(self):
+        """The paradigm this experiment inherits from its group's _base.yaml."""
+        tree, group = config_tree(), self._group_name()
+        if tree is None or group is None:
+            return None
+        return tree.group(group).paradigm
+
     def _render_experiment_boxes(self):
         """Render standard boxes for an Experiment configuration."""
         data = self.raw_data
 
-        # Paradigm badge
-        paradigm = data.get("paradigm", "online_rl")
+        # Paradigm badge. Only 2 of the 66 experiments set `paradigm` themselves;
+        # the rest inherit it from their group's _base.yaml, so falling back to a
+        # fixed default would mislabel almost all of them and filter the form by
+        # the wrong rules.
+        paradigm = data.get("paradigm") or self._inherited_paradigm() or "online_rl"
         if paradigm:
             self.paradigm_badge.setText(str(paradigm).upper())
             self.paradigm_badge.show()

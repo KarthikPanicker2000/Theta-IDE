@@ -248,19 +248,28 @@ class ExperimentGroup:
         return cls(name=directory.name, paradigm=raw.get("paradigm"), env=env, has_base=True)
 
 
-def group_base_yaml(env: str, paradigm: str, seed: int = 1) -> str:
-    """The _base.yaml for a new group, which is what binds env and paradigm."""
-    return (
-        "# @package _global_\n"
-        "defaults:\n"
-        f"  - override /env: {env}\n"
-        "\n"
-        f"paradigm: {paradigm}\n"
-        "\n"
-        f"seed: {seed}\n"
-        "save_dataset: false\n"
-        "recover: false\n"
-    )
+def group_base_yaml(env: str, paradigm: str, rules: Paradigm | None = None, seed: int = 1) -> str:
+    """The _base.yaml for a new group, which is what binds env and paradigm.
+
+    in/config/config.yaml defaults intervals_count to 4 and eval_episodes to 100
+    for the online case, so a base whose paradigm forbids them must pin them to
+    their only legal values - exactly as the existing offline bases do. Leaving
+    them to the root defaults makes every experiment in the group invalid.
+    """
+    lines = [
+        "# @package _global_",
+        "defaults:",
+        f"  - override /env: {env}",
+        "",
+        f"paradigm: {paradigm}",
+        "",
+    ]
+    if rules is not None and not rules.field_enabled("intervals_count"):
+        lines.append("intervals_count: 1")
+    if rules is not None and not rules.field_enabled("eval_episodes"):
+        lines.append("eval_episodes: 0")
+    lines += [f"seed: {seed}", "save_dataset: false", "recover: false"]
+    return "\n".join(lines) + "\n"
 
 
 def experiment_yaml(

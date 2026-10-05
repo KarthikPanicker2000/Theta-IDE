@@ -51,10 +51,32 @@ class TestGroupDiscovery(unittest.TestCase):
 
 
 class TestGroupBaseYaml(unittest.TestCase):
+    def setUp(self):
+        self.tree = ConfigTree.discover()
+
     def test_binds_env_and_paradigm(self):
         data = parse(group_base_yaml("cartpole", "online_rl"))
         self.assertEqual(data["paradigm"], "online_rl")
         self.assertIn({"override /env": "cartpole"}, data["defaults"])
+
+    def test_offline_base_pins_fields_the_root_defaults_would_break(self):
+        """config.yaml defaults intervals_count to 4, which offline_rl rejects,
+        so the base must override it as the existing offline bases do."""
+        data = parse(group_base_yaml("mimic", "offline_rl", self.tree.paradigms["offline_rl"]))
+        self.assertEqual(data["intervals_count"], 1)
+        self.assertEqual(data["eval_episodes"], 0)
+
+    def test_online_base_leaves_rollout_fields_to_the_defaults(self):
+        data = parse(group_base_yaml("cartpole", "online_rl", self.tree.paradigms["online_rl"]))
+        self.assertNotIn("intervals_count", data)
+        self.assertNotIn("eval_episodes", data)
+
+    def test_generated_base_matches_the_shape_of_an_existing_offline_base(self):
+        """mimic/_base.yaml is the reference for what an offline base must pin."""
+        existing = parse((self.tree.config_root / "experiment" / "mimic" / "_base.yaml").read_text())
+        generated = parse(group_base_yaml("mimic", "offline_rl", self.tree.paradigms["offline_rl"]))
+        for key in ("intervals_count", "eval_episodes"):
+            self.assertEqual(generated[key], existing[key], f"{key} differs from the reference base")
 
     def test_is_a_global_package(self):
         self.assertTrue(group_base_yaml("mimic", "offline_rl").startswith("# @package _global_"))
@@ -145,6 +167,25 @@ class TestGeneratedExperimentsMatchParadigmRules(unittest.TestCase):
                     self.assertNotIn(field, data, f"{name} ({group.paradigm}) wrote forbidden {field}")
             checked += 1
         self.assertGreater(checked, 5, "expected several groups to declare a paradigm")
+
+
+class TestParadigmInheritance(unittest.TestCase):
+    """Only 2 of 66 experiments declare `paradigm`; the rest inherit it from the
+    group base, so anything reading it must resolve through the group."""
+
+    def setUp(self):
+        self.tree = ConfigTree.discover()
+
+    def test_most_experiments_do_not_declare_a_paradigm(self):
+        declared = sum(1 for e in self.tree.experiments.values() if "paradigm" in e.raw)
+        self.assertLess(declared, len(self.tree.experiments) / 2)
+
+    def test_group_supplies_the_paradigm_the_experiment_omits(self):
+        for name, expected in (("mimic", "offline_rl"), ("cartpole", "online_rl")):
+            for experiment in self.tree.experiments_in(name):
+                if "paradigm" not in experiment.raw:
+                    self.assertEqual(self.tree.group(name).paradigm, expected)
+                    break
 
 
 if __name__ == "__main__":
