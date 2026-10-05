@@ -1,10 +1,12 @@
 """Full-screen, simplified, boxed configuration viewer for Theta-IDE."""
+import math
 import random
 from pathlib import Path
 
 import yaml
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
+    QAbstractSpinBox,
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
@@ -25,6 +27,35 @@ from PyQt6.QtWidgets import (
 
 from .config_model import ConfigTree
 from .widgets import label
+
+# Forms stay readable on wide windows: the column of boxes stops growing past CONTENT_WIDTH,
+# and fields in label/field rows are capped by kind so a number doesn't get a 1,000px box.
+CONTENT_WIDTH = 860
+NUMBER_FIELD_WIDTH = 200
+TEXT_FIELD_WIDTH = 380
+
+
+class CompactDoubleSpinBox(QDoubleSpinBox):
+    """Keeps six decimals of precision but shows 0.95 rather than 0.950000."""
+
+    def textFromValue(self, value):
+        text = f"{value:.{self.decimals()}f}".rstrip("0").rstrip(".")
+        return "0" if text in ("", "-0") else text
+
+
+def number_field(value):
+    """Spin box for a YAML number: floats step at one tenth of their magnitude, and values
+    that start non-negative (counts, coefficients) can't be pushed below zero."""
+    if isinstance(value, float):
+        spin = CompactDoubleSpinBox()
+        spin.setDecimals(6)
+        magnitude = math.floor(math.log10(abs(value))) if value else -1
+        spin.setSingleStep(10.0 ** (magnitude - 1))
+    else:
+        spin = QSpinBox()
+    spin.setRange(0 if value >= 0 else -1000000, 100000000)
+    spin.setValue(value)
+    return spin
 
 _CONFIG_TREE = None
 _CONFIG_TREE_LOADED = False
@@ -132,6 +163,7 @@ class ConfigViewer(QWidget):
         self.scroll.setObjectName("configScrollArea")
 
         self.container = QWidget()
+        self.container.setMaximumWidth(CONTENT_WIDTH)
         self.boxes_layout = QVBoxLayout(self.container)
         self.boxes_layout.setContentsMargins(12, 10, 12, 16)
         self.boxes_layout.setSpacing(14)
@@ -188,8 +220,25 @@ class ConfigViewer(QWidget):
         else:
             self._render_generic_boxes()
 
+        self._cap_form_fields()
         self.boxes_layout.addStretch()
         self._block_updates = False
+
+    def _cap_form_fields(self):
+        """Limit field widths in every label/field form; grid rows already share the capped column."""
+        for form in self.container.findChildren(QFormLayout):
+            for row in range(form.rowCount()):
+                item = form.itemAt(row, QFormLayout.ItemRole.FieldRole)
+                widget = item.widget() if item else None
+                label_item = form.itemAt(row, QFormLayout.ItemRole.LabelRole)
+                if widget is not None and label_item and isinstance(label_item.widget(), QLabel):
+                    # Labels sit at the top of their row; match the field height so the text lines up
+                    label_item.widget().setMinimumHeight(widget.sizeHint().height())
+                    label_item.widget().setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+                if isinstance(widget, QAbstractSpinBox):
+                    widget.setMaximumWidth(NUMBER_FIELD_WIDTH)
+                elif isinstance(widget, (QComboBox, QLineEdit)):
+                    widget.setMaximumWidth(TEXT_FIELD_WIDTH)
 
     def _render_experiment_boxes(self):
         """Render standard boxes for an Experiment configuration."""
@@ -572,11 +621,7 @@ class ConfigViewer(QWidget):
                     chk.toggled.connect(lambda val, key=k: self._on_field_edited(key, val))
                     form.addRow(k, chk)
                 elif isinstance(v, (int, float)):
-                    spin = QDoubleSpinBox() if isinstance(v, float) else QSpinBox()
-                    spin.setRange(-1000000, 100000000)
-                    if isinstance(v, float):
-                        spin.setDecimals(6)
-                    spin.setValue(v)
+                    spin = number_field(v)
                     spin.valueChanged.connect(lambda val, key=k: self._on_field_edited(key, val))
                     form.addRow(k, spin)
                 else:

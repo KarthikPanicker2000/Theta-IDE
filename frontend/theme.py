@@ -3,6 +3,7 @@ import copy
 import json
 from pathlib import Path
 import re
+import tempfile
 
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette
@@ -143,6 +144,16 @@ QPushButton:disabled, QPushButton#primary:disabled { color: #665c54; background:
 QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox { background: #1d2021; border: 1px solid #504945; border-radius: 3px; padding: 6px; min-height: 18px; selection-background-color: #665c54; }
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus { border-color: #d79921; }
 QComboBox QAbstractItemView { background: #32302f; selection-background-color: #504945; }
+QSpinBox, QDoubleSpinBox { padding-right: 30px; }
+QSpinBox::up-button, QDoubleSpinBox::up-button, QSpinBox::down-button, QDoubleSpinBox::down-button { subcontrol-origin: border; width: 24px; background: #3c3836; border: 0; border-left: 1px solid #504945; }
+QSpinBox::up-button, QDoubleSpinBox::up-button { subcontrol-position: top right; border-bottom: 1px solid #504945; border-top-right-radius: 3px; }
+QSpinBox::down-button, QDoubleSpinBox::down-button { subcontrol-position: bottom right; border-bottom-right-radius: 3px; }
+QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover, QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover { background: #504945; }
+QSpinBox::up-button:pressed, QDoubleSpinBox::up-button:pressed, QSpinBox::down-button:pressed, QDoubleSpinBox::down-button:pressed { background: #665c54; }
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow { image: url("@ARROW_UP@"); width: 10px; height: 10px; }
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow { image: url("@ARROW_DOWN@"); width: 10px; height: 10px; }
+QSpinBox::up-arrow:disabled, QSpinBox::up-arrow:off, QDoubleSpinBox::up-arrow:disabled, QDoubleSpinBox::up-arrow:off { image: url("@ARROW_UP_OFF@"); }
+QSpinBox::down-arrow:disabled, QSpinBox::down-arrow:off, QDoubleSpinBox::down-arrow:disabled, QDoubleSpinBox::down-arrow:off { image: url("@ARROW_DOWN_OFF@"); }
 QPlainTextEdit, QTextEdit { background: #1d2021; border: 0; padding: 10px; selection-background-color: #504945; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 12px; }
 QTreeWidget, QTableWidget { background: #282828; alternate-background-color: #32302f; border: 0; outline: 0; }
 QTreeWidget::item { padding: 6px 2px; }
@@ -173,9 +184,28 @@ QLabel#configError { color: #d79921; }
 """
 
 
+_CHEVRON = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polyline points="{points}" fill="none" '
+            'stroke="{color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>')
+_CHEVRON_POINTS = {"UP": "2 6.5 5 3.5 8 6.5", "DOWN": "2 3.5 5 6.5 8 3.5"}
+
+
+def _chevron(direction, color):
+    """Write a chevron in this color for spin-box arrows; Qt stylesheets can only load them from files."""
+    folder = Path(tempfile.gettempdir()) / "thetaide_style"
+    path = folder / f"chevron_{direction.lower()}_{color.lstrip('#')}.svg"
+    if not path.exists():
+        folder.mkdir(parents=True, exist_ok=True)
+        path.write_text(_CHEVRON.format(points=_CHEVRON_POINTS[direction], color=color), encoding="utf-8")
+    return path.as_posix()
+
+
 def stylesheet(theme):
     colors = theme["colors"]
-    return re.sub(r"#[0-9a-fA-F]{6}", lambda m: colors[_LEGACY_ROLES[m[0]]], _BASE_STYLE)
+    style = re.sub(r"#[0-9a-fA-F]{6}", lambda m: colors[_LEGACY_ROLES[m[0]]], _BASE_STYLE)
+    for direction in _CHEVRON_POINTS:
+        style = style.replace(f"@ARROW_{direction}@", _chevron(direction, colors["text"]))
+        style = style.replace(f"@ARROW_{direction}_OFF@", _chevron(direction, colors["disabled"]))
+    return style
 
 
 STYLE = stylesheet(DEFAULT)  # Backward-compatible default for tests and previews.
