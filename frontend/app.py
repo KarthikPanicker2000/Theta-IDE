@@ -2247,7 +2247,7 @@ def main():
     app.setStyleSheet(STYLE)
     app.wheel_guard = wheel_guard.install(app)
 
-    icon_path = Path(__file__).resolve().parent / "icons" / "theta_app_icon.svg"
+    icon_path = Path(__file__).resolve().parent / "icons" / "theta_bracket_icon.svg"
     if icon_path.is_file():
         app.setWindowIcon(QIcon(str(icon_path)))
 

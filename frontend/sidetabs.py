@@ -233,11 +233,13 @@ class SideTabs(QWidget):
         return [self.tabs[tid]["icon"] for tid in self.tab_order]
 
     def set_logo_icon(self):
-        source_path = ICON_DIR / "theta_logo.svg"
+        """Corner logo: the bracket-theta mark, tinted with the current theme's accent."""
+        source_path = ICON_DIR / "theta_bracket_mark.svg"
         if not source_path.exists():
             return
         ratio = QApplication.instance().devicePixelRatio() if QApplication.instance() else 1.0
-        renderer = QSvgRenderer(str(source_path))
+        source = source_path.read_text(encoding="utf-8").replace("currentColor", theme_color("accent"))
+        renderer = QSvgRenderer(QByteArray(source.encode("utf-8")))
         pixmap = QPixmap(round(36 * ratio), round(36 * ratio))
         pixmap.fill(Qt.GlobalColor.transparent)
         painter = QPainter(pixmap)
