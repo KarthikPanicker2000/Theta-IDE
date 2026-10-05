@@ -156,10 +156,7 @@ class BlenderActor(nn.Module):
         for i, module in enumerate(self.policy_modules):
             m_type = self.module_types[i]
             if m_type == "neural":
-                if hasattr(module, "get_action_probs"):
-                    probs = module.get_action_probs(neural_state)
-                else:
-                    probs = module(neural_state)
+                probs = module.get_action_probs(neural_state)
             elif m_type == "logic":
                 probs = self._map_logic_output(module.get_action_probs(logic_state), module)
             else:
@@ -375,18 +372,17 @@ class BlenderActorCritic(nn.Module):
     def __init__(
         self,
         env,
-        rules="default",
-        actor_mode="hybrid",
-        blender_mode="neural",
-        blend_function="softmax",
-        reasoner="nsfr",
-        device=None,
+        rules,
+        actor_mode,
+        blender_mode,
+        blend_function,
+        reasoner,
+        device,
         architecture=None,
         rng=None,
         explain=False,
         modules=None,
         cfg=None,  # For accessing other agent hyperparams
-        **kwargs,
     ):
         super().__init__()
         self.device = device

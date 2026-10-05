@@ -5,7 +5,6 @@ blender:
   blend_function: softmax
 blend_q_values: true
 
-
 neural:
   type: dnn
   hidden_sizes: [256, 256]
