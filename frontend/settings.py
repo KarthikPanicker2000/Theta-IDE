@@ -51,6 +51,11 @@ theme = "Catppuccin"
 
 # Enable the rotating 3-D ASCII sculpture on the Settings & About panel.
 ascii_animation = true
+ascii_speed = 1.0
+ascii_size = 1.0
+ascii_thickness = 1.0
+ascii_tilt = 1.0
+ascii_distance = 4.8
 
 [backend]
 # FastAPI backend that manages training runs and pipelines.
@@ -64,6 +69,7 @@ timeout = 5
 order = [
     "components",
     "config",
+    "workflows",
     "monitor",
     "results",
     "plots",
@@ -78,6 +84,7 @@ order = [
 visible = [
     "components",
     "config",
+    "workflows",
     "monitor",
     "terminal",
     "console",
@@ -167,9 +174,16 @@ def _write_toml_file(path: Path, data: dict) -> None:
             # Top-level scalar (unusual but tolerated)
             lines.append(f"{section} = {_toml_value(value)}")
         else:
-            lines.append(f"\n[{section}]")
-            for k, v in value.items():
-                lines.append(f"{k} = {_toml_value(v)}")
+            scalars = {k: v for k, v in value.items() if not isinstance(v, dict)}
+            subdicts = {k: v for k, v in value.items() if isinstance(v, dict)}
+            if scalars or not subdicts:
+                lines.append(f"\n[{section}]")
+                for k, v in scalars.items():
+                    lines.append(f"{k} = {_toml_value(v)}")
+            for sub, subval in subdicts.items():
+                lines.append(f"\n[{section}.{sub}]")
+                for k, v in subval.items():
+                    lines.append(f"{k} = {_toml_value(v)}")
     content = "\n".join(lines).lstrip("\n") + "\n"
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".toml.tmp")
@@ -313,6 +327,41 @@ class SettingsManager(QObject):
         return bool(self.get("appearance", "ascii_animation", default=True))
 
     @property
+    def ascii_speed(self) -> float:
+        try:
+            return float(self.get("appearance", "ascii_speed", default=1.0))
+        except (ValueError, TypeError):
+            return 1.0
+
+    @property
+    def ascii_size(self) -> float:
+        try:
+            return float(self.get("appearance", "ascii_size", default=1.0))
+        except (ValueError, TypeError):
+            return 1.0
+
+    @property
+    def ascii_thickness(self) -> float:
+        try:
+            return float(self.get("appearance", "ascii_thickness", default=1.0))
+        except (ValueError, TypeError):
+            return 1.0
+
+    @property
+    def ascii_tilt(self) -> float:
+        try:
+            return float(self.get("appearance", "ascii_tilt", default=1.0))
+        except (ValueError, TypeError):
+            return 1.0
+
+    @property
+    def ascii_distance(self) -> float:
+        try:
+            return float(self.get("appearance", "ascii_distance", default=4.8))
+        except (ValueError, TypeError):
+            return 4.8
+
+    @property
     def backend_url(self) -> str:
         return self.get("backend", "url", default="http://127.0.0.1:8000")
 
@@ -349,6 +398,15 @@ class SettingsManager(QObject):
     @property
     def hotkeys_terminal_precedence(self) -> bool:
         return bool(self.get("hotkeys", "terminal_precedence", default=True))
+
+    @property
+    def hotkey_bindings(self) -> dict[str, str]:
+        v = self.get("hotkeys", "bindings", default=None)
+        if isinstance(v, dict):
+            return dict(v)
+        # Default bindings derived from hotkey_panes
+        panes = self.hotkey_panes
+        return {pid: f"Action + {i}" for i, pid in enumerate(panes)}
 
     @property
     def hotkey_panes(self) -> list[str]:

@@ -38,7 +38,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import average_precision_score, precision_recall_curve, roc_auc_score
 
 from plot.base import BasePlotter, clean_label, get_canonical_method_name, get_method_aliases
-from src.usr.methods.method_registry import get_style as get_method_style
+from src.usr.methods.method_style_registry import get_style as get_method_style
 
 
 def compute_trajectory_agreement(
@@ -103,18 +103,7 @@ class ClinicalAlignmentPlotter(BasePlotter):
             return {}, {}
 
         exp_cfg = self.get_experiment_config(exp_id)
-        active_aliases = set()
-        has_active_filter = False
-        for key in ["online_methods", "offline_methods"]:
-            val = exp_cfg.get(key, [])
-            if val:
-                has_active_filter = True
-                if isinstance(val, (list, tuple)):
-                    methods = list(val)
-                else:
-                    methods = [item.strip() for item in str(val).split(",") if item.strip()]
-                for m in methods:
-                    active_aliases.update(get_method_aliases(m))
+        active_aliases, has_active_filter = self.get_active_aliases(exp_cfg)
 
         method_ckpts = {}
         method_interval_ckpts = {}
@@ -123,7 +112,7 @@ class ClinicalAlignmentPlotter(BasePlotter):
         for method_dir in sorted(ckpt_root.iterdir()):
             if method_dir.is_dir():
                 m_name = method_dir.name
-                if has_active_filter and m_name not in active_aliases:
+                if not self.is_method_active(m_name, active_aliases, has_active_filter):
                     continue
 
                 canon = get_canonical_method_name(m_name)
@@ -175,12 +164,18 @@ class ClinicalAlignmentPlotter(BasePlotter):
         return method_ckpts, method_interval_ckpts
 
     def _load_agent(self, path, dev):
-        from src.usr.methods.cew_agent import CEWAgent
         from src.usr.methods.cql_agent import CQLAgent
         from src.usr.methods.iql_agent import IQLAgent
 
+        classes = [CQLAgent, IQLAgent]
+        try:
+            from src.usr.methods.cew_agent import CEWAgent
+            classes.insert(1, CEWAgent)
+        except ImportError:
+            pass
+
         last_error = None
-        for cls in [CQLAgent, CEWAgent, IQLAgent]:
+        for cls in classes:
             try:
                 ag = cls.load_from_checkpoint(str(path), map_location=dev, weights_only=False)
                 ag.to(dev)
