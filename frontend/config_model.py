@@ -208,7 +208,95 @@ class ConfigTree:
 
     @property
     def groups(self) -> list[str]:
-        return sorted({e.group for e in self.experiments.values()})
+        return sorted({e.group for e in self.experiments.values()} | set(self.experiment_groups))
+
+    @property
+    def experiment_groups(self) -> dict[str, ExperimentGroup]:
+        root = self.config_root / "experiment"
+        if not root.is_dir():
+            return {}
+        return {d.name: ExperimentGroup.from_dir(d) for d in sorted(root.iterdir()) if d.is_dir()}
+
+    def group(self, name: str) -> ExperimentGroup:
+        return self.experiment_groups.get(name) or ExperimentGroup(name=name)
+
+
+@dataclass(frozen=True)
+class ExperimentGroup:
+    """A directory under in/config/experiment/, described by its _base.yaml.
+
+    The base is what binds an environment and a paradigm, so every experiment in
+    the group inherits them; individual experiments only choose methods and a
+    training budget.
+    """
+
+    name: str
+    paradigm: str | None = None
+    env: str | None = None
+    has_base: bool = False
+
+    @classmethod
+    def from_dir(cls, directory: Path) -> ExperimentGroup:
+        base = directory / "_base.yaml"
+        if not base.is_file():
+            return cls(name=directory.name)
+        raw = _read_yaml(base)
+        env = None
+        for entry in raw.get("defaults") or []:
+            if isinstance(entry, dict):
+                env = entry.get("override /env", env)
+        return cls(name=directory.name, paradigm=raw.get("paradigm"), env=env, has_base=True)
+
+
+def group_base_yaml(env: str, paradigm: str, seed: int = 1) -> str:
+    """The _base.yaml for a new group, which is what binds env and paradigm."""
+    return (
+        "# @package _global_\n"
+        "defaults:\n"
+        f"  - override /env: {env}\n"
+        "\n"
+        f"paradigm: {paradigm}\n"
+        "\n"
+        f"seed: {seed}\n"
+        "save_dataset: false\n"
+        "recover: false\n"
+    )
+
+
+def experiment_yaml(
+    group: str,
+    experiment_id: str,
+    paradigm: Paradigm | None = None,
+    agent: str | None = None,
+    model: str | None = None,
+    seed: int = 42,
+    total_timesteps: int = 10000,
+) -> str:
+    """A valid experiment for `group`, omitting whatever its paradigm forbids.
+
+    Offline and supervised paradigms reject intervals_count > 1 and non-zero
+    eval_episodes, and their group bases already pin both to legal values, so
+    the experiment must not restate them.
+    """
+    lines = [
+        "# @package _global_",
+        "defaults:",
+        f"  - {group}/_base",
+        "",
+        f"experiment_id: {experiment_id}",
+        f"seed: {seed}",
+        f"total_timesteps: {total_timesteps}",
+    ]
+    if paradigm is None or paradigm.field_enabled("intervals_count"):
+        lines.append("intervals_count: 4")
+    if paradigm is None or paradigm.field_enabled("eval_episodes"):
+        lines.append("eval_episodes: 100")
+    lines += ["", "tensorboard: true"]
+
+    if agent:
+        model = model or "dnn"
+        lines += ["", "methods:", f"  {agent}_{model}:", f"    agent: {agent}", f"    model: {model}"]
+    return "\n".join(lines) + "\n"
 
 
 @dataclass

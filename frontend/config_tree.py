@@ -1,11 +1,24 @@
 """Tree widget mirroring in/config/ directory for Theta-IDE."""
 from pathlib import Path
+
 import yaml
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
-    QLineEdit, QPushButton, QLabel, QInputDialog, QMessageBox, QMenu, QToolButton
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QToolButton,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
+
+from .config_model import ConfigTree, experiment_yaml, group_base_yaml
 from .widgets import label
 
 
@@ -294,6 +307,74 @@ class ConfigTreeWidget(QWidget):
             return True
         return False
 
+    def _model(self):
+        """The parsed in/config tree, or None when it cannot be read."""
+        try:
+            return ConfigTree(self.root_dir)
+        except (OSError, ValueError):
+            return None
+
+    def _ensure_group_base(self, tree, group_name):
+        """Make sure the group has a _base.yaml, prompting for env and paradigm.
+
+        An experiment inherits its environment and paradigm from the group base,
+        so creating one in a group without a base produces a config Hydra cannot
+        even load ("Could not load 'experiment/<group>/_base'").
+
+        Returns the group's paradigm name, or None if the user cancelled.
+        """
+        group = tree.group(group_name)
+        if group.has_base:
+            return group.paradigm
+
+        paradigm, ok = QInputDialog.getItem(
+            self, "New Group", f"'{group_name}' is a new group.\nWhich paradigm do its experiments use?",
+            sorted(tree.paradigms), 0, False
+        )
+        if not ok:
+            return None
+
+        envs = [e.name for e in tree.environments_for(paradigm)]
+        if not envs:
+            QMessageBox.warning(self, "No Environments",
+                                f"No environment is compatible with '{paradigm}'.")
+            return None
+        env, ok = QInputDialog.getItem(
+            self, "New Group", f"Environment for '{group_name}' ({paradigm}):", envs, 0, False
+        )
+        if not ok:
+            return None
+
+        base_dir = self.root_dir / "experiment" / group_name
+        base_dir.mkdir(parents=True, exist_ok=True)
+        (base_dir / "_base.yaml").write_text(group_base_yaml(env, paradigm), encoding="utf-8")
+        return paradigm
+
+    def _write_experiment(self, group_name, filename, exp_id):
+        """Create an experiment valid for its group's paradigm. Returns rel path or None."""
+        tree = self._model()
+        paradigm_name, paradigm, agent = None, None, None
+        if tree is not None:
+            paradigm_name = self._ensure_group_base(tree, group_name)
+            if paradigm_name is None and not tree.group(group_name).has_base:
+                return None
+            paradigm = tree.paradigms.get(paradigm_name) if paradigm_name else None
+            permitted = [a.name for a in tree.agents_for(paradigm_name)] if paradigm_name else []
+            agent = permitted[0] if permitted else None
+
+        target_dir = self.root_dir / "experiment" / group_name
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target_file = target_dir / filename
+        if target_file.exists():
+            QMessageBox.warning(self, "File Exists", f"Experiment file already exists:\n{target_file}")
+            return None
+        try:
+            target_file.write_text(experiment_yaml(group_name, exp_id, paradigm, agent), encoding="utf-8")
+        except OSError as exc:
+            QMessageBox.critical(self, "Error Creating Experiment", f"Could not create file:\n{exc}")
+            return None
+        return f"experiment/{group_name}/{filename}"
+
     def get_available_groups(self):
         """Return sorted list of experiment groups in in/config/experiment/."""
         exp_dir = self.root_dir / "experiment"
@@ -331,34 +412,10 @@ class ConfigTreeWidget(QWidget):
             name_file = name
             exp_id = name[:-5]
 
-        target_dir = self.root_dir / "experiment" / group
-        target_dir.mkdir(parents=True, exist_ok=True)
-        target_file = target_dir / name_file
-
-        if target_file.exists():
-            QMessageBox.warning(self, "File Exists", f"Experiment file already exists:\n{target_file}")
-            return
-
-        # Default experiment template
-        content = (
-            "# @package _global_\n"
-            "defaults:\n"
-            f"- {group}/_base\n\n"
-            f"experiment_id: {exp_id}\n"
-            "seed: 42\n"
-            "total_timesteps: 10000\n"
-            "intervals_count: 4\n"
-            "eval_episodes: 100\n\n"
-            "# Custom overrides for this experiment\n"
-            "tensorboard: true\n"
-        )
-        try:
-            target_file.write_text(content, encoding="utf-8")
+        rel_path = self._write_experiment(group, name_file, exp_id)
+        if rel_path:
             self.populate()
-            rel_path = f"experiment/{group}/{name_file}"
             self.select_file(rel_path)
-        except OSError as exc:
-            QMessageBox.critical(self, "Error Creating Experiment", f"Could not create file:\n{exc}")
 
     def prompt_duplicate(self):
         """Prompt to duplicate the currently selected experiment."""
@@ -461,30 +518,10 @@ class ConfigTreeWidget(QWidget):
         filename = f"{name}.yaml" if not name.endswith(".yaml") else name
         exp_id = name.replace(".yaml", "")
 
-        target_dir = self.root_dir / "experiment" / group_name
-        target_dir.mkdir(parents=True, exist_ok=True)
-        target_file = target_dir / filename
-        if target_file.exists():
-            QMessageBox.warning(self, "File Exists", f"Experiment file already exists:\n{target_file}")
-            return
-
-        content = (
-            "# @package _global_\n"
-            "defaults:\n"
-            f"- {group_name}/_base\n\n"
-            f"experiment_id: {exp_id}\n"
-            "seed: 42\n"
-            "total_timesteps: 10000\n"
-            "intervals_count: 4\n"
-            "eval_episodes: 100\n"
-            "tensorboard: true\n"
-        )
-        try:
-            target_file.write_text(content, encoding="utf-8")
+        rel_path = self._write_experiment(group_name, filename, exp_id)
+        if rel_path:
             self.populate()
-            self.select_file(f"experiment/{group_name}/{filename}")
-        except OSError as exc:
-            QMessageBox.critical(self, "Error", str(exc))
+            self.select_file(rel_path)
 
     def prompt_new_component(self):
         """Prompt to create a new component configuration (agent, env, model, etc.)."""
