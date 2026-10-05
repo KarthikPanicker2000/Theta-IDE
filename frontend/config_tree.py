@@ -179,13 +179,14 @@ class ConfigTreeWidget(QWidget):
             self.select_file(self.current_rel_path)
 
     def _tool_button(self, icon_name, text=None):
-        """Header button with a themed SVG icon, and a label beside it when text is given."""
+        """Square header button with a themed SVG icon; text, if any, becomes its accessible name."""
         button = QToolButton()
         button.setIcon(svg_icon(icon_name, TOOL_ICON_COLORS))
         button.setIconSize(QSize(16, 16))
+        button.setFixedSize(30, 30)
+        button.setStyleSheet("padding: 0;")
         if text:
-            button.setText(text)
-            button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+            button.setAccessibleName(text)
         return button
 
     def _add_dir_node(self, parent_widget, dir_path: Path, expand=False):

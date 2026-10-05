@@ -34,7 +34,7 @@ from .config_viewer import ConfigViewer
 from .components_panel import ComponentsPanel
 from .plots import PlotViewer
 from .queue_panel import QueuePanel
-from .sidetabs import SideTabs
+from .sidetabs import SideTabs, svg_icon
 from .tensorboard import TensorBoardPanel
 from .terminal import TerminalPanel
 from .plugins import PluginManager
@@ -173,24 +173,21 @@ class Window(QMainWindow):
 
         actions_bar = QHBoxLayout()
         actions_bar.setSpacing(8)
-        actions_bar.addWidget(self.button("+  New in group…", self.new_experiment))
-        actions_bar.addWidget(self.button("Duplicate…", self.duplicate_experiment))
-        self.start_button = self.button("▶  Launch training", self.launch_training, True)
+        self.start_button = self.button("Launch training", self.launch_training, True)
         self.start_button.setToolTip("Train the loaded experiment config through the backend (F5)")
         self.start_button.setEnabled(False)
         actions_bar.addWidget(self.start_button)
-        self.queue_button = self.button("＋  Add to queue", self.add_to_queue)
+        self.queue_button = self.button("Add to queue", self.add_to_queue)
         self.queue_button.setToolTip("Queue the loaded config; queued jobs train one at a time, in order (Ctrl+Shift+Q)")
         self.queue_button.setEnabled(False)
         actions_bar.addWidget(self.queue_button)
-        self.stop_button = self.button("■  Stop", self.stop_run)
+        self.stop_button = self.button("Stop", self.stop_run)
         self.stop_button.setEnabled(False)
         actions_bar.addWidget(self.stop_button)
-        actions_bar.addWidget(self.button("Save YAML", self.save_current_config))
         actions_bar.addWidget(self.button("Export recipe YAML…", self.export_config))
         actions_bar.addStretch()
 
-        self.btn_toggle_yaml = QPushButton("{ }  View Hydra YAML")
+        self.btn_toggle_yaml = QPushButton("View Hydra YAML")
         self.btn_toggle_yaml.setCheckable(True)
         self.btn_toggle_yaml.setChecked(False)
         self.btn_toggle_yaml.setToolTip("Toggle preview of the resolved Hydra YAML configuration")
@@ -286,23 +283,23 @@ class Window(QMainWindow):
         self.run_combo.currentIndexChanged.connect(self.on_run_combo_changed)
         nav_row.addWidget(self.run_combo, 1)
 
-        self.btn_prev_run = QPushButton("◀ Prev")
+        self.btn_prev_run = QPushButton("Previous")
         self.btn_prev_run.setToolTip("View previous experiment run in history")
         self.btn_prev_run.clicked.connect(self.select_prev_run)
         nav_row.addWidget(self.btn_prev_run)
 
-        self.btn_next_run = QPushButton("Next ▶")
+        self.btn_next_run = QPushButton("Next")
         self.btn_next_run.setToolTip("View next experiment run in history")
         self.btn_next_run.clicked.connect(self.select_next_run)
         nav_row.addWidget(self.btn_next_run)
 
-        self.btn_live_jump = QPushButton("🟢 Jump to Live")
+        self.btn_live_jump = QPushButton("Jump to live")
         self.btn_live_jump.setToolTip("Return view to the currently training run")
         self.btn_live_jump.clicked.connect(self.jump_to_live_run)
         self.btn_live_jump.hide()
         nav_row.addWidget(self.btn_live_jump)
 
-        self.btn_pin_baseline = QPushButton("📌 Pin as Baseline")
+        self.btn_pin_baseline = QPushButton("Pin as baseline")
         self.btn_pin_baseline.setCheckable(True)
         self.btn_pin_baseline.setToolTip("Pin this run to overlay as a dashed baseline curve on other runs")
         self.btn_pin_baseline.clicked.connect(self.toggle_pin_baseline)
@@ -316,7 +313,7 @@ class Window(QMainWindow):
         caption_row = QHBoxLayout()
         self.run_caption = label("Configure an experiment, then launch training.", "muted")
         caption_row.addWidget(self.run_caption, 1)
-        self.storage_label = label("📁 results/logs/  •  🗄️ results/jobs/jobs.db", "muted")
+        self.storage_label = label("results/logs/  ·  results/jobs/jobs.db", "muted")
         caption_row.addWidget(self.storage_label)
         layout.addLayout(caption_row)
         row = QHBoxLayout()
@@ -344,7 +341,7 @@ class Window(QMainWindow):
         self.monitor_note.setWordWrap(True)
         monitor_footer = QHBoxLayout()
         monitor_footer.addWidget(self.monitor_note, 1)
-        monitor_footer.addWidget(self.button("Open TensorBoard  →", self.show_tensorboard))
+        monitor_footer.addWidget(self.button("Open TensorBoard", self.show_tensorboard))
         layout.addLayout(monitor_footer)
         self.monitor_panel = monitor
         self.tabs.addTab(self.monitor_panel, "Training monitor", "monitor", "Monitor", tab_id="monitor")
@@ -529,7 +526,7 @@ class Window(QMainWindow):
         tc_layout.setContentsMargins(14, 12, 14, 12)
         tc_layout.setSpacing(10)
         tc_layout.addWidget(label("APPEARANCE", "eyebrow"))
-        tc_layout.addWidget(label("Theme & Palette", "heading"))
+        tc_layout.addWidget(label("Theme & Palette", "cardTitle"))
         tc_layout.addWidget(label("Select a color palette or customize individual UI roles.", "muted"))
         theme_row = QHBoxLayout()
         theme_row.addWidget(label("Active theme:", "muted"))
@@ -538,10 +535,12 @@ class Window(QMainWindow):
             self.settings_theme_select.addItem(name)
         self.settings_theme_select.setCurrentText(self.theme_manager.active["name"])
         self.settings_theme_select.currentTextChanged.connect(self.settings_theme_selected)
+        self.settings_theme_select.setMaximumWidth(320)
         theme_row.addWidget(self.settings_theme_select, 1)
         btn_builder = QPushButton("Customize palette…")
         btn_builder.clicked.connect(self.show_theme_builder)
         theme_row.addWidget(btn_builder)
+        theme_row.addStretch()
         tc_layout.addLayout(theme_row)
         left_layout.addWidget(theme_card)
 
@@ -552,7 +551,7 @@ class Window(QMainWindow):
         sb_layout.setContentsMargins(14, 12, 14, 12)
         sb_layout.setSpacing(10)
         sb_layout.addWidget(label("SIDEBAR & NAVIGATION", "eyebrow"))
-        sb_layout.addWidget(label("Panels & Visibility", "heading"))
+        sb_layout.addWidget(label("Panels & Visibility", "cardTitle"))
         sb_layout.addWidget(label("Toggle which panels appear in the sidebar. Drag icons on the left activity bar to reorder.", "muted"))
 
         panes_grid = QVBoxLayout()
@@ -609,7 +608,7 @@ class Window(QMainWindow):
         pc_layout.setContentsMargins(14, 12, 14, 12)
         pc_layout.setSpacing(10)
         pc_layout.addWidget(label("EXTENSIONS & PLUGINS", "eyebrow"))
-        pc_layout.addWidget(label("Installed Plugins", "heading"))
+        pc_layout.addWidget(label("Installed Plugins", "cardTitle"))
         pc_layout.addWidget(label("Enable or disable modular plugins. Extensions dynamically mount panels into the sidebar.", "muted"))
 
         self.plugins_grid = QVBoxLayout()
@@ -619,7 +618,7 @@ class Window(QMainWindow):
         self.refresh_plugins_ui()
 
         hub_btn_row = QHBoxLayout()
-        btn_browse_hub = QPushButton("🌐 Browse Community Hub…")
+        btn_browse_hub = QPushButton("Browse Community Hub…")
         btn_browse_hub.setToolTip("Explore and install community plugins, RL methods, and models")
         btn_browse_hub.clicked.connect(lambda: self.open_hub("plugin"))
         hub_btn_row.addWidget(btn_browse_hub)
@@ -635,7 +634,7 @@ class Window(QMainWindow):
         hk_layout.setContentsMargins(14, 12, 14, 12)
         hk_layout.setSpacing(10)
         hk_layout.addWidget(label("KEYBOARD SHORTCUTS & NAVIGATION", "eyebrow"))
-        hk_layout.addWidget(label("Action Key & Pane Hotkeys", "heading"))
+        hk_layout.addWidget(label("Action Key & Pane Hotkeys", "cardTitle"))
         hk_layout.addWidget(
             label("Revolve IDE navigation around an Action key (Ctrl+B / Caps Lock by default). "
                   "Press or hold the Action key, then press 0–9 to quickly move between open panes.", "muted")
@@ -661,21 +660,23 @@ class Window(QMainWindow):
             self.settings_action_key_combo.addItem(cur_action_key.replace("_", " ").title(), cur_action_key)
             self.settings_action_key_combo.setCurrentText(cur_action_key.replace("_", " ").title())
         self.settings_action_key_combo.currentIndexChanged.connect(self._on_action_key_changed)
+        self.settings_action_key_combo.setMaximumWidth(320)
         ak_row.addWidget(self.settings_action_key_combo, 1)
+        ak_row.addStretch()
         hk_layout.addLayout(ak_row)
 
         hk_table = QLabel(
             "<table style='font-size: 11px; line-height: 1.6; color: rgba(255,255,255,0.75);'>"
-            "<tr><td style='padding-right: 20px;'><code>Action + 0</code> ➔ Settings & About</td>"
-            "<td><code>Action + 5</code> ➔ Plot viewer</td></tr>"
-            "<tr><td style='padding-right: 20px;'><code>Action + 1</code> ➔ Components</td>"
-            "<td><code>Action + 6</code> ➔ TensorBoard</td></tr>"
-            "<tr><td style='padding-right: 20px;'><code>Action + 2</code> ➔ Experiment builder</td>"
-            "<td><code>Action + 7</code> ➔ Job queue</td></tr>"
-            "<tr><td style='padding-right: 20px;'><code>Action + 3</code> ➔ Training monitor</td>"
-            "<td><code>Action + 8</code> ➔ Terminal</td></tr>"
-            "<tr><td style='padding-right: 20px;'><code>Action + 4</code> ➔ Results browser</td>"
-            "<td><code>Action + 9</code> ➔ Console</td></tr>"
+            "<tr><td style='padding-right: 20px;'><b>Action + 0</b> → Settings & About</td>"
+            "<td><b>Action + 5</b> → Plot viewer</td></tr>"
+            "<tr><td style='padding-right: 20px;'><b>Action + 1</b> → Components</td>"
+            "<td><b>Action + 6</b> → TensorBoard</td></tr>"
+            "<tr><td style='padding-right: 20px;'><b>Action + 2</b> → Experiment builder</td>"
+            "<td><b>Action + 7</b> → Job queue</td></tr>"
+            "<tr><td style='padding-right: 20px;'><b>Action + 3</b> → Training monitor</td>"
+            "<td><b>Action + 8</b> → Terminal</td></tr>"
+            "<tr><td style='padding-right: 20px;'><b>Action + 4</b> → Results browser</td>"
+            "<td><b>Action + 9</b> → Console</td></tr>"
             "</table>"
         )
         hk_table.setStyleSheet("padding: 2px 0;")
@@ -690,19 +691,21 @@ class Window(QMainWindow):
         bc_layout.setContentsMargins(14, 12, 14, 12)
         bc_layout.setSpacing(10)
         bc_layout.addWidget(label("BACKEND SERVICES", "eyebrow"))
-        bc_layout.addWidget(label("NeSyRL API & Training Engine", "heading"))
+        bc_layout.addWidget(label("NeSyRL API & Training Engine", "cardTitle"))
         bc_layout.addWidget(label("Connects to the FastAPI backend managing training runs and pipelines.", "muted"))
         url_row = QHBoxLayout()
         url_row.addWidget(label("API URL:", "muted"))
         self.settings_backend_url = QLineEdit(self.backend.base_url)
         self.settings_backend_url.setReadOnly(True)
+        self.settings_backend_url.setMaximumWidth(320)
         url_row.addWidget(self.settings_backend_url, 1)
         btn_test = QPushButton("Test connection")
         btn_test.clicked.connect(self.test_backend_connection)
         url_row.addWidget(btn_test)
-        btn_docs = QPushButton("Swagger docs ↗")
+        btn_docs = QPushButton("Swagger docs")
         btn_docs.clicked.connect(self.open_swagger_docs)
         url_row.addWidget(btn_docs)
+        url_row.addStretch()
         bc_layout.addLayout(url_row)
         self.settings_backend_status = label("Status: Checking connection…", "muted")
         bc_layout.addWidget(self.settings_backend_status)
@@ -715,7 +718,7 @@ class Window(QMainWindow):
         sc_layout.setContentsMargins(14, 12, 14, 12)
         sc_layout.setSpacing(10)
         sc_layout.addWidget(label("LOCAL STORAGE", "eyebrow"))
-        sc_layout.addWidget(label("Workspace & Cache", "heading"))
+        sc_layout.addWidget(label("Workspace & Cache", "cardTitle"))
         sc_layout.addWidget(label(f"Data root:  {self.store.root}", "muted"))
         self.settings_runs_count_label = label(f"Total run records:  {len(self.runs)} runs", "muted")
         sc_layout.addWidget(self.settings_runs_count_label)
@@ -724,7 +727,7 @@ class Window(QMainWindow):
         btn_reset_layout.setToolTip("Restore default pane sizes and layout")
         btn_reset_layout.clicked.connect(lambda: (self.restoreState(self.default_layout), self.statusBar().showMessage("Restored default UI layout.", 4000)))
         btn_row.addWidget(btn_reset_layout)
-        btn_open_settings = QPushButton("Open settings.toml ↗")
+        btn_open_settings = QPushButton("Open settings.toml")
         btn_open_settings.setToolTip(
             f"Open the settings file in your default text editor\n{self.settings_manager.workspace_settings_path}"
         )
@@ -742,6 +745,11 @@ class Window(QMainWindow):
         left_scroll.setWidgetResizable(True)
         left_scroll.setWidget(left_container)
         left_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        # Long descriptions wrap to the column instead of forcing a sideways scroll
+        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        for text in left_container.findChildren(QLabel):
+            if text.objectName() == "muted":
+                text.setWordWrap(True)
 
         # Right Column: About ThetaIDE & ASCII Sculpture
         right_card = QFrame()
@@ -751,7 +759,7 @@ class Window(QMainWindow):
         rc_layout.setSpacing(10)
         rc_layout.addWidget(label("ABOUT THETA-IDE", "eyebrow"))
         title_row = QHBoxLayout()
-        title_row.addWidget(label("ThetaIDE", "heading"))
+        title_row.addWidget(label("ThetaIDE", "cardTitle"))
         badge = label("v0.1.0-alpha", "badge")
         title_row.addWidget(badge)
         title_row.addStretch()
@@ -940,14 +948,10 @@ class Window(QMainWindow):
                 row.addWidget(slider)
 
                 btn_settings = QToolButton()
-                btn_settings.setText("⚙")
+                btn_settings.setIcon(svg_icon("settings", {(QIcon.Mode.Normal, QIcon.State.Off): "text"}))
                 btn_settings.setToolTip(f"{manifest.name} Settings")
-                btn_settings.setFixedSize(28, 28)
+                btn_settings.setFixedSize(30, 30)
                 btn_settings.setCursor(Qt.CursorShape.PointingHandCursor)
-                btn_settings.setStyleSheet(
-                    "QToolButton { border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; background: rgba(255, 255, 255, 0.04); font-size: 16px; } "
-                    "QToolButton:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.3); }"
-                )
                 btn_settings.clicked.connect(lambda _, p=pid: self.open_plugin_settings(p))
                 row.addWidget(btn_settings)
 
@@ -1907,15 +1911,15 @@ class Window(QMainWindow):
         if hasattr(self, "storage_label"):
             if live:
                 where = f"results/logs/{run['backend']['group']}/{run['backend']['experiment_id']}/"
-                self.storage_label.setText(f"📁 {where}  •  🗄️ results/jobs/jobs.db")
+                self.storage_label.setText(f"{where}  ·  results/jobs/jobs.db")
             else:
-                self.storage_label.setText("📁 Simulated demo run (in-memory)  •  🗄️ results/jobs/jobs.db")
+                self.storage_label.setText("Simulated demo run (in-memory)  ·  results/jobs/jobs.db")
 
         # Update Live Jump button
         if hasattr(self, "btn_live_jump"):
             if self.active and self.selected != self.active:
                 live_id = self.active["backend"]["experiment_id"] if not self.active["simulated"] else self.active["config"]["name"]
-                chip_text = f"🟢 Jump to Live ({live_id[:14]}…)" if len(live_id) > 14 else f"🟢 Jump to Live ({live_id})"
+                chip_text = f"Jump to live ({live_id[:14]}…)" if len(live_id) > 14 else f"Jump to live ({live_id})"
                 self.btn_live_jump.setText(chip_text)
                 self.btn_live_jump.show()
             else:
@@ -1925,17 +1929,17 @@ class Window(QMainWindow):
         if hasattr(self, "btn_pin_baseline"):
             if self.pinned_baseline_run is None:
                 self.btn_pin_baseline.setChecked(False)
-                self.btn_pin_baseline.setText("📌 Pin as Baseline")
+                self.btn_pin_baseline.setText("Pin as baseline")
                 self.btn_pin_baseline.setToolTip("Pin this run's curve to overlay as a dashed baseline when inspecting other runs")
             elif self.pinned_baseline_run is run:
                 self.btn_pin_baseline.setChecked(True)
-                self.btn_pin_baseline.setText("📌 Pinned Baseline")
+                self.btn_pin_baseline.setText("Pinned baseline")
                 self.btn_pin_baseline.setToolTip("This run is currently pinned as the baseline. Click to unpin.")
             else:
                 self.btn_pin_baseline.setChecked(False)
                 p_name = self.pinned_baseline_run["backend"]["experiment_id"] if not self.pinned_baseline_run["simulated"] else self.pinned_baseline_run["config"]["name"]
                 label_name = (p_name[:12] + "…") if len(p_name) > 12 else p_name
-                self.btn_pin_baseline.setText(f"📌 Replace Baseline ({label_name})")
+                self.btn_pin_baseline.setText(f"Replace baseline ({label_name})")
                 self.btn_pin_baseline.setToolTip(f"Baseline '{p_name}' is pinned. Click to replace it with this run.")
 
         # Update Prev/Next button states
@@ -2037,11 +2041,11 @@ class Window(QMainWindow):
                 name = config["name"] if run["simulated"] else run["backend"]["experiment_id"]
                 status = run.get("status", "")
                 if status in LIVE_STATUSES:
-                    icon = "🟢 "
+                    icon = "● "
                 elif status == "completed":
                     icon = "✓ "
                 elif status in ("failed", "interrupted", "stopped"):
-                    icon = "✖ "
+                    icon = "✗ "
                 else:
                     icon = "○ "
                 last_reward = latest(run, "reward")

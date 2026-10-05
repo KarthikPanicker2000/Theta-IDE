@@ -130,6 +130,7 @@ QTabBar::tab:hover { color: #ebdbb2; background: #32302f; }
 QLabel#brand { color: #fabd2f; font-size: 24px; font-weight: 700; padding-right: 12px; }
 QLabel#muted { color: #a89984; }
 QLabel#heading { font-size: 23px; font-weight: 600; }
+QLabel#cardTitle { font-size: 16px; font-weight: 600; }
 QLabel#eyebrow { color: #83a598; font-size: 10px; font-weight: 700; }
 QLabel#badge { background: #3c3836; color: #fabd2f; border-radius: 4px; padding: 5px 9px; }
 QLabel#value { color: #b8bb26; font-size: 25px; font-weight: 600; }
@@ -167,6 +168,21 @@ QScrollArea { border: 0; }
 QScrollBar:vertical { background: #282828; width: 9px; }
 QScrollBar::handle:vertical { background: #504945; min-height: 25px; border-radius: 4px; }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+QScrollBar:horizontal { background: #282828; height: 9px; }
+QScrollBar::handle:horizontal { background: #504945; min-width: 25px; border-radius: 4px; }
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
+QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
+QCheckBox, QRadioButton { background: transparent; spacing: 8px; }
+QCheckBox::indicator { width: 14px; height: 14px; border: 1px solid #504945; border-radius: 3px; background: #1d2021; }
+QCheckBox::indicator:hover { border-color: #a89984; }
+QCheckBox::indicator:checked { background: #d79921; border-color: #d79921; image: url("@CHECK@"); }
+QCheckBox::indicator:disabled { background: #32302f; border-color: #3c3836; }
+QCheckBox:disabled { color: #665c54; }
+QSlider { background: transparent; }
+QSlider::groove:horizontal { height: 4px; background: #3c3836; border-radius: 2px; }
+QSlider::sub-page:horizontal { background: #d79921; border-radius: 2px; }
+QSlider::handle:horizontal { width: 14px; height: 14px; margin: -5px 0; border-radius: 7px; background: #ebdbb2; }
+QSlider::handle:horizontal:hover { background: #fabd2f; }
 QStatusBar { color: #a89984; border-top: 1px solid #504945; }
 QToolTip { background: #3c3836; color: #ebdbb2; border: 1px solid #665c54; padding: 5px; }
 QStatusBar QLabel { background: transparent; }
@@ -186,7 +202,7 @@ QLabel#configError { color: #d79921; }
 
 _CHEVRON = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><polyline points="{points}" fill="none" '
             'stroke="{color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>')
-_CHEVRON_POINTS = {"UP": "2 6.5 5 3.5 8 6.5", "DOWN": "2 3.5 5 6.5 8 3.5"}
+_CHEVRON_POINTS = {"UP": "2 6.5 5 3.5 8 6.5", "DOWN": "2 3.5 5 6.5 8 3.5", "CHECK": "2 5.2 4.2 7.4 8 2.8"}
 
 
 def _chevron(direction, color):
@@ -205,7 +221,7 @@ def stylesheet(theme):
     for direction in _CHEVRON_POINTS:
         style = style.replace(f"@ARROW_{direction}@", _chevron(direction, colors["text"]))
         style = style.replace(f"@ARROW_{direction}_OFF@", _chevron(direction, colors["disabled"]))
-    return style
+    return style.replace("@CHECK@", _chevron("CHECK", colors["base"]))
 
 
 STYLE = stylesheet(DEFAULT)  # Backward-compatible default for tests and previews.

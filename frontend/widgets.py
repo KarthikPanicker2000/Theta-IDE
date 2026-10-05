@@ -251,7 +251,7 @@ class Chart(QWidget):
         if self.custom_x_range:
             painter.setFont(QFont("Segoe UI", 8))
             painter.setPen(QColor(theme_color("comment")))
-            painter.drawText(QRectF(16, 28, 220, 16), Qt.AlignmentFlag.AlignLeft, "🔍 Zoomed (double-click to reset)")
+            painter.drawText(QRectF(16, 28, 220, 16), Qt.AlignmentFlag.AlignLeft, "Zoomed (double-click to reset)")
 
         def y_of(value):
             return area.bottom() - area.height() * (value - lo) / max(1e-12, hi - lo)

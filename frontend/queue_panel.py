@@ -34,7 +34,7 @@ class QueuePanel(QWidget):
         about.setWordWrap(True)
         layout.addWidget(about)
         state_row = QHBoxLayout()
-        self.run_button = self.button("▶  Start queue", lambda: self.on_toggle(not self.running))
+        self.run_button = self.button("Start queue", lambda: self.on_toggle(not self.running))
         state_row.addWidget(self.run_button)
         self.state = label("", "muted")
         self.state.setWordWrap(True)
@@ -57,9 +57,9 @@ class QueuePanel(QWidget):
         layout.addWidget(self.table, 1)
 
         actions = QHBoxLayout()
-        self.up_button = self.button("▲  Move up", lambda: self.move_selected(-1))
-        self.down_button = self.button("▼  Move down", lambda: self.move_selected(1))
-        self.remove_button = self.button("✕  Remove from queue", self.remove_selected)
+        self.up_button = self.button("Move up", lambda: self.move_selected(-1))
+        self.down_button = self.button("Move down", lambda: self.move_selected(1))
+        self.remove_button = self.button("Remove from queue", self.remove_selected)
         self.open_button = self.button("Open in monitor", self.open_selected)
         for button in (self.up_button, self.down_button, self.remove_button, self.open_button):
             actions.addWidget(button)
@@ -129,7 +129,7 @@ class QueuePanel(QWidget):
                                + ("  The job already training will finish." if active else ""))
         else:
             self.state.setText("Queue empty. Add experiments with “Add to queue”.")
-        self.run_button.setText("⏸  Pause queue" if self.running else "▶  Start queue")
+        self.run_button.setText("Pause queue" if self.running else "Start queue")
         self.run_button.setObjectName("" if self.running else "primary")
         self.run_button.setStyle(self.run_button.style())
         self.run_button.setEnabled(self.running or self.queued_count > 0)

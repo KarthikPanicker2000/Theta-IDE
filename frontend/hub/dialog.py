@@ -93,7 +93,7 @@ class HubComponentCard(QFrame):
 
         if self.component.repository:
             btn_repo = QToolButton()
-            btn_repo.setText("GitHub ↗")
+            btn_repo.setText("GitHub")
             btn_repo.setStyleSheet("color: #8ec07c; font-size: 11px; border: none; background: transparent;")
             btn_repo.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_repo.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(self.component.repository)))
@@ -201,14 +201,14 @@ class HubDialog(QDialog):
 
         self.sort_combo = QComboBox()
         self.sort_combo.addItem("Default", "default")
-        self.sort_combo.addItem("✨ Uninstalled First", "uninstalled_first")
-        self.sort_combo.addItem("📦 Installed First", "installed_first")
-        self.sort_combo.addItem("🔤 Name (A - Z)", "name_asc")
+        self.sort_combo.addItem("Uninstalled first", "uninstalled_first")
+        self.sort_combo.addItem("Installed first", "installed_first")
+        self.sort_combo.addItem("Name (A–Z)", "name_asc")
         self.sort_combo.setToolTip("Sort components list")
         self.sort_combo.currentIndexChanged.connect(self._apply_filters)
         search_row.addWidget(self.sort_combo)
 
-        self.btn_refresh = QPushButton("↺ Refresh")
+        self.btn_refresh = QPushButton("Refresh")
         self.btn_refresh.setToolTip("Reload registry from GitHub")
         self.btn_refresh.clicked.connect(lambda: self.client.fetch_index_async(force=True))
         search_row.addWidget(self.btn_refresh)
@@ -222,10 +222,10 @@ class HubDialog(QDialog):
         self.pills = {}
         kind_options = [
             ("all", "All Components"),
-            ("plugin", "🔌 Plugins"),
-            ("method", "⚡ RL Methods"),
-            ("model", "🧠 Models"),
-            ("env", "🌍 Environments"),
+            ("plugin", "Plugins"),
+            ("method", "RL Methods"),
+            ("model", "Models"),
+            ("env", "Environments"),
         ]
 
         for kind_id, label_text in kind_options:

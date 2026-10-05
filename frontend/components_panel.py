@@ -35,29 +35,9 @@ class ComponentsPanel(QWidget):
         actions_bar = QHBoxLayout()
         actions_bar.setSpacing(8)
 
-        self.btn_new = QPushButton("+  New component…")
-        self.btn_new.setToolTip("Create a new modular component config (agent, env, model, etc.)")
-        self.btn_new.clicked.connect(self.new_component)
-        actions_bar.addWidget(self.btn_new)
-
-        self.btn_duplicate = QPushButton("Duplicate…")
-        self.btn_duplicate.setToolTip("Duplicate the currently selected component configuration")
-        self.btn_duplicate.clicked.connect(self.duplicate_component)
-        actions_bar.addWidget(self.btn_duplicate)
-
-        self.btn_save = QPushButton("Save YAML")
-        self.btn_save.setToolTip("Save changes to disk (Ctrl+S)")
-        self.btn_save.clicked.connect(self.save_current)
-        actions_bar.addWidget(self.btn_save)
-
-        self.btn_reload = QPushButton("↺  Reload")
-        self.btn_reload.setToolTip("Reload component files and tree from disk")
-        self.btn_reload.clicked.connect(self.reload_components)
-        actions_bar.addWidget(self.btn_reload)
-
         actions_bar.addStretch()
 
-        self.btn_toggle_raw = QPushButton("{ }  View Raw YAML")
+        self.btn_toggle_raw = QPushButton("View Raw YAML")
         self.btn_toggle_raw.setCheckable(True)
         self.btn_toggle_raw.setChecked(False)
         self.btn_toggle_raw.setToolTip("Toggle side-by-side view of the raw YAML file content")

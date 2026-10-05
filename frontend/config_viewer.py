@@ -225,7 +225,21 @@ class ConfigViewer(QWidget):
         self._block_updates = False
 
     def _cap_form_fields(self):
-        """Limit field widths in every label/field form; grid rows already share the capped column."""
+        """Limit field widths in every label/field form and two-column grid."""
+        for grid in self.container.findChildren(QGridLayout):
+            for index in range(grid.count()):
+                widget = grid.itemAt(index).widget()
+                if isinstance(widget, QAbstractSpinBox):
+                    widget.setMaximumWidth(NUMBER_FIELD_WIDTH)
+                elif isinstance(widget, (QComboBox, QLineEdit)):
+                    widget.setMaximumWidth(NUMBER_FIELD_WIDTH)
+            # An empty last column takes the slack, so fields stay next to their labels
+            grid.setColumnStretch(grid.columnCount(), 1)
+        for row_layout in self.container.findChildren(QHBoxLayout):
+            for index in range(row_layout.count()):
+                widget = row_layout.itemAt(index).widget()
+                if isinstance(widget, QAbstractSpinBox):
+                    widget.setMaximumWidth(NUMBER_FIELD_WIDTH)
         for form in self.container.findChildren(QFormLayout):
             for row in range(form.rowCount()):
                 item = form.itemAt(row, QFormLayout.ItemRole.FieldRole)
@@ -348,6 +362,7 @@ class ConfigViewer(QWidget):
         btn_rand_seed.setToolTip("Pick a random seed")
         btn_rand_seed.clicked.connect(lambda: self.spin_seed.setValue(random.randint(1, 9999)))
         seed_row.addWidget(btn_rand_seed)
+        seed_row.addStretch()
         form_budget.addLayout(seed_row, 0, 3)
 
         # Intervals count
@@ -401,6 +416,7 @@ class ConfigViewer(QWidget):
         self.chk_no_plot.toggled.connect(lambda v: self._on_field_edited("no_plot", v))
         chk_row.addWidget(self.chk_no_plot)
 
+        chk_row.addStretch()
         form_budget.addLayout(chk_row, 2, 0, 1, 4)
 
         box_budget.add_layout(form_budget)
@@ -435,7 +451,7 @@ class ConfigViewer(QWidget):
                 sc_layout = QFormLayout(sub_card)
                 sc_layout.setVerticalSpacing(8)
 
-                title_lbl = label(f"Method: {m_name}", "heading")
+                title_lbl = label(f"Method: {m_name}", "cardTitle")
                 sc_layout.addRow(title_lbl)
 
                 # Agent — restricted to what this paradigm permits
@@ -490,7 +506,7 @@ class ConfigViewer(QWidget):
 
                 # Learning rate
                 if "lr" in m_spec:
-                    spin_lr = QDoubleSpinBox()
+                    spin_lr = CompactDoubleSpinBox()
                     spin_lr.setDecimals(6)
                     spin_lr.setRange(0.000001, 1.0)
                     spin_lr.setSingleStep(0.0001)
