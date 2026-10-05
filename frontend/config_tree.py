@@ -12,7 +12,8 @@ from .widgets import label
 
 TOOL_ICON_COLORS = {
     (QIcon.Mode.Normal, QIcon.State.Off): "text",
-    (QIcon.Mode.Disabled, QIcon.State.Off): "muted",
+    (QIcon.Mode.Active, QIcon.State.Off): "accent",
+    (QIcon.Mode.Disabled, QIcon.State.Off): "disabled",
 }
 
 
@@ -181,6 +182,7 @@ class ConfigTreeWidget(QWidget):
     def _tool_button(self, icon_name, text=None):
         """Square header button with a themed SVG icon; text, if any, becomes its accessible name."""
         button = QToolButton()
+        button.setProperty("svg_icon", icon_name)
         button.setIcon(svg_icon(icon_name, TOOL_ICON_COLORS))
         button.setIconSize(QSize(16, 16))
         button.setFixedSize(30, 30)
@@ -188,6 +190,13 @@ class ConfigTreeWidget(QWidget):
         if text:
             button.setAccessibleName(text)
         return button
+
+    def refresh_icons(self):
+        """Re-render the header icons in the current theme's colors."""
+        for button in self.findChildren(QToolButton):
+            name = button.property("svg_icon")
+            if name:
+                button.setIcon(svg_icon(name, TOOL_ICON_COLORS))
 
     def _add_dir_node(self, parent_widget, dir_path: Path, expand=False):
         name = dir_path.name

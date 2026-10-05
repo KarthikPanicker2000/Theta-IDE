@@ -1274,6 +1274,10 @@ class Window(QMainWindow):
         self.theme_status.setText(f"  ●  Local workspace    /    {self.theme_manager.active['name']}")
         self.highlighter.rehighlight()
         self.tabs.refresh_icons()
+        for tree in (getattr(self, "config_tree", None),
+                     getattr(getattr(self, "components_panel", None), "components_tree", None)):
+            if tree is not None:
+                tree.refresh_icons()
         if hasattr(self, "settings_theme_select"):
             self.settings_theme_select.blockSignals(True)
             self.settings_theme_select.setCurrentText(self.theme_manager.active["name"])
