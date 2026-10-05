@@ -173,7 +173,7 @@ class Window(QMainWindow):
         actions_bar = QHBoxLayout()
         actions_bar.setSpacing(8)
         actions_bar.addWidget(self.button("+  New in group…", self.new_experiment))
-        actions_bar.addWidget(self.button("📑  Duplicate…", self.duplicate_experiment))
+        actions_bar.addWidget(self.button("Duplicate…", self.duplicate_experiment))
         self.start_button = self.button("▶  Launch training", self.launch_training, True)
         self.start_button.setToolTip("Train the loaded experiment config through the backend (F5)")
         self.start_button.setEnabled(False)
@@ -185,7 +185,7 @@ class Window(QMainWindow):
         self.stop_button = self.button("■  Stop", self.stop_run)
         self.stop_button.setEnabled(False)
         actions_bar.addWidget(self.stop_button)
-        actions_bar.addWidget(self.button("💾  Save YAML", self.save_current_config))
+        actions_bar.addWidget(self.button("Save YAML", self.save_current_config))
         actions_bar.addWidget(self.button("Export recipe YAML…", self.export_config))
         actions_bar.addStretch()
 

@@ -1,12 +1,19 @@
 """Tree widget mirroring in/config/ directory for Theta-IDE."""
 from pathlib import Path
 import yaml
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
-    QLineEdit, QPushButton, QLabel, QInputDialog, QMessageBox, QMenu, QToolButton
+    QLineEdit, QPushButton, QLabel, QInputDialog, QMessageBox, QMenu, QStyle, QToolButton
 )
+from .sidetabs import svg_icon
 from .widgets import label
+
+TOOL_ICON_COLORS = {
+    (QIcon.Mode.Normal, QIcon.State.Off): "text",
+    (QIcon.Mode.Disabled, QIcon.State.Off): "muted",
+}
 
 
 def find_config_root():
@@ -21,17 +28,6 @@ def find_config_root():
         if p.exists() and p.is_dir():
             return p.resolve()
     return (Path(__file__).resolve().parent.parent / "in" / "config").resolve()
-
-
-FOLDER_ICONS = {
-    "experiment": "🧪",
-    "agent": "🤖",
-    "env": "🌐",
-    "model": "🧠",
-    "paradigms": "⚙️",
-    "site": "🖥️",
-    "hydra": "⚡",
-}
 
 
 class ConfigTreeWidget(QWidget):
@@ -69,28 +65,24 @@ class ConfigTreeWidget(QWidget):
         header.addWidget(title)
         header.addStretch()
 
-        self.btn_refresh = QToolButton()
-        self.btn_refresh.setText("↺")
+        self.btn_refresh = self._tool_button("reload")
         self.btn_refresh.setToolTip("Reload configuration files from disk")
         self.btn_refresh.clicked.connect(self.populate)
         header.addWidget(self.btn_refresh)
 
-        self.btn_collapse = QToolButton()
-        self.btn_collapse.setText("⊟")
+        self.btn_collapse = self._tool_button("collapse_all")
         self.btn_collapse.setToolTip("Collapse all folders in the tree")
         self.btn_collapse.clicked.connect(self.collapse_all)
         self.btn_collapse_all = self.btn_collapse  # alias
         header.addWidget(self.btn_collapse)
 
-        self.btn_expand = QToolButton()
-        self.btn_expand.setText("⊞")
+        self.btn_expand = self._tool_button("expand_all")
         self.btn_expand.setToolTip("Expand all folders in the tree")
         self.btn_expand.clicked.connect(self.expand_all)
         self.btn_expand_all = self.btn_expand  # alias
         header.addWidget(self.btn_expand)
 
-        self.btn_new = QToolButton()
-        self.btn_new.setText("+ New")
+        self.btn_new = self._tool_button("new_file", "New")
         if self.mode == "components":
             self.btn_new.setToolTip("Create a new modular component (agent, env, model, etc.)")
             self.btn_new.clicked.connect(self.prompt_new_component)
@@ -100,8 +92,7 @@ class ConfigTreeWidget(QWidget):
         self.btn_new_group = self.btn_new  # backwards compatibility alias
         header.addWidget(self.btn_new)
 
-        self.btn_duplicate = QToolButton()
-        self.btn_duplicate.setText("📑 Copy")
+        self.btn_duplicate = self._tool_button("copy", "Copy")
         if self.mode in ("experiments", "experiment"):
             self.btn_duplicate.setToolTip("Duplicate currently selected experiment")
         elif self.mode == "components":
@@ -187,10 +178,20 @@ class ConfigTreeWidget(QWidget):
         if self.current_rel_path:
             self.select_file(self.current_rel_path)
 
+    def _tool_button(self, icon_name, text=None):
+        """Header button with a themed SVG icon, and a label beside it when text is given."""
+        button = QToolButton()
+        button.setIcon(svg_icon(icon_name, TOOL_ICON_COLORS))
+        button.setIconSize(QSize(16, 16))
+        if text:
+            button.setText(text)
+            button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        return button
+
     def _add_dir_node(self, parent_widget, dir_path: Path, expand=False):
         name = dir_path.name
-        icon = FOLDER_ICONS.get(name, "📁")
-        node = QTreeWidgetItem(parent_widget, [f"{icon}  {name}"])
+        node = QTreeWidgetItem(parent_widget, [name])
+        node.setIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon))
         rel_path = str(dir_path.relative_to(self.root_dir))
         node.setData(0, Qt.ItemDataRole.UserRole, {
             "type": "dir",
@@ -221,7 +222,8 @@ class ConfigTreeWidget(QWidget):
         rel_path = str(file_path.relative_to(self.root_dir))
         is_exp = rel_path.startswith("experiment/") and not name.startswith("_")
 
-        node = QTreeWidgetItem(parent_node, [f"📄  {name}"])
+        node = QTreeWidgetItem(parent_node, [name])
+        node.setIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
         node.setData(0, Qt.ItemDataRole.UserRole, {
             "type": "file",
             "path": str(file_path),

@@ -118,7 +118,7 @@ class ConfigViewer(QWidget):
 
         hb_layout.addStretch()
 
-        self.btn_save = QPushButton("💾 Save")
+        self.btn_save = QPushButton("Save")
         self.btn_save.setToolTip("Save changes to this configuration file (Ctrl+S)")
         self.btn_save.clicked.connect(self.save_to_disk)
         self.btn_save.setEnabled(False)
@@ -295,7 +295,7 @@ class ConfigViewer(QWidget):
         self.field_widgets["seed"] = self.spin_seed
 
         btn_rand_seed = QToolButton()
-        btn_rand_seed.setText("🎲")
+        btn_rand_seed.setText("Random")
         btn_rand_seed.setToolTip("Pick a random seed")
         btn_rand_seed.clicked.connect(lambda: self.spin_seed.setValue(random.randint(1, 9999)))
         seed_row.addWidget(btn_rand_seed)

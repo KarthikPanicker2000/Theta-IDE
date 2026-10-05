@@ -40,12 +40,12 @@ class ComponentsPanel(QWidget):
         self.btn_new.clicked.connect(self.new_component)
         actions_bar.addWidget(self.btn_new)
 
-        self.btn_duplicate = QPushButton("📑  Duplicate…")
+        self.btn_duplicate = QPushButton("Duplicate…")
         self.btn_duplicate.setToolTip("Duplicate the currently selected component configuration")
         self.btn_duplicate.clicked.connect(self.duplicate_component)
         actions_bar.addWidget(self.btn_duplicate)
 
-        self.btn_save = QPushButton("💾  Save YAML")
+        self.btn_save = QPushButton("Save YAML")
         self.btn_save.setToolTip("Save changes to disk (Ctrl+S)")
         self.btn_save.clicked.connect(self.save_current)
         actions_bar.addWidget(self.btn_save)
@@ -64,7 +64,7 @@ class ComponentsPanel(QWidget):
         self.btn_toggle_raw.clicked.connect(lambda: self.toggle_raw_preview())
         actions_bar.addWidget(self.btn_toggle_raw)
 
-        self.btn_hub = QPushButton("🌐 Component Hub…")
+        self.btn_hub = QPushButton("Component Hub…")
         self.btn_hub.setToolTip("Browse and install new RL methods, models, and environments from the Community Hub")
         self.btn_hub.clicked.connect(self._open_hub)
         actions_bar.addWidget(self.btn_hub)
