@@ -512,7 +512,7 @@ class Window(QMainWindow):
 
         layout.addWidget(label("WORKSPACE & PREFERENCES", "eyebrow"))
         layout.addWidget(label("Settings & About", "heading"))
-        layout.addWidget(label("Configure visual themes, backend connectivity, workspace storage, and quick commands.", "muted"))
+        layout.addWidget(label("Configure visual themes, backend connectivity, workspace storage, and quick commands.", "muted", wrap=True))
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setChildrenCollapsible(False)
@@ -531,7 +531,7 @@ class Window(QMainWindow):
         tc_layout.setSpacing(10)
         tc_layout.addWidget(label("APPEARANCE", "eyebrow"))
         tc_layout.addWidget(label("Theme & Palette", "heading"))
-        tc_layout.addWidget(label("Select a color palette or customize individual UI roles.", "muted"))
+        tc_layout.addWidget(label("Select a color palette or customize individual UI roles.", "muted", wrap=True))
         theme_row = QHBoxLayout()
         theme_row.addWidget(label("Active theme:", "muted"))
         self.settings_theme_select = QComboBox()
@@ -554,7 +554,7 @@ class Window(QMainWindow):
         sb_layout.setSpacing(10)
         sb_layout.addWidget(label("SIDEBAR & NAVIGATION", "eyebrow"))
         sb_layout.addWidget(label("Panels & Visibility", "heading"))
-        sb_layout.addWidget(label("Toggle which panels appear in the sidebar. Drag icons on the left activity bar to reorder.", "muted"))
+        sb_layout.addWidget(label("Toggle which panels appear in the sidebar. Drag icons on the left activity bar to reorder.", "muted", wrap=True))
 
         panes_grid = QVBoxLayout()
         panes_grid.setSpacing(8)
@@ -578,7 +578,7 @@ class Window(QMainWindow):
             info_layout.setSpacing(1)
             title_lbl = label(name)
             title_lbl.setStyleSheet("font-weight: 600;")
-            desc_lbl = label(desc, "muted")
+            desc_lbl = label(desc, "muted", wrap=True)
             info_layout.addWidget(title_lbl)
             info_layout.addWidget(desc_lbl)
             row.addLayout(info_layout, 1)
@@ -611,7 +611,7 @@ class Window(QMainWindow):
         pc_layout.setSpacing(10)
         pc_layout.addWidget(label("EXTENSIONS & PLUGINS", "eyebrow"))
         pc_layout.addWidget(label("Installed Plugins", "heading"))
-        pc_layout.addWidget(label("Enable or disable modular plugins. Extensions dynamically mount panels into the sidebar.", "muted"))
+        pc_layout.addWidget(label("Enable or disable modular plugins. Extensions dynamically mount panels into the sidebar.", "muted", wrap=True))
 
         self.plugins_grid = QVBoxLayout()
         self.plugins_grid.setSpacing(8)
@@ -639,7 +639,7 @@ class Window(QMainWindow):
         hk_layout.addWidget(label("Action Key & Pane Hotkeys", "heading"))
         hk_layout.addWidget(
             label("Revolve IDE navigation around an Action key (Ctrl+B / Caps Lock by default). "
-                  "Press or hold the Action key, then press 0–9 to quickly move between open panes.", "muted")
+                  "Press or hold the Action key, then press 0–9 to quickly move between open panes.", "muted", wrap=True)
         )
 
         ak_row = QHBoxLayout()
@@ -692,7 +692,7 @@ class Window(QMainWindow):
         bc_layout.setSpacing(10)
         bc_layout.addWidget(label("BACKEND SERVICES", "eyebrow"))
         bc_layout.addWidget(label("NeSyRL API & Training Engine", "heading"))
-        bc_layout.addWidget(label("Connects to the FastAPI backend managing training runs and pipelines.", "muted"))
+        bc_layout.addWidget(label("Connects to the FastAPI backend managing training runs and pipelines.", "muted", wrap=True))
         url_row = QHBoxLayout()
         url_row.addWidget(label("API URL:", "muted"))
         self.settings_backend_url = QLineEdit(self.backend.base_url)

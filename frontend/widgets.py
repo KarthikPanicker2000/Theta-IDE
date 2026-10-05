@@ -6,10 +6,13 @@ from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QFrame, QAbstractButto
 from .theme import theme_color
 
 
-def label(text, kind=None):
+def label(text, kind=None, wrap=False):
+    """A QLabel styled by `kind` (its object name). wrap=True lets long text flow onto more lines
+    instead of setting a minimum width for its whole layout."""
     result = QLabel(text)
     if kind:
         result.setObjectName(kind)
+    result.setWordWrap(wrap)
     return result
 
 
