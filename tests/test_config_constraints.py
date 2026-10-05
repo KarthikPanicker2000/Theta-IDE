@@ -228,5 +228,73 @@ class TestOverrides(ConfigViewerConstraintTest):
         self.assertIn("total_timesteps=5000", overrides)
 
 
+@unittest.skipIf(not HAS_PYQT6, "PyQt6 not installed in current environment")
+class TestInheritedValuesAreVisible(unittest.TestCase):
+    """A disabled field showed the widget default, which is not the value the run
+    uses, and "(inherit from base)" never said what was inherited."""
+
+    def viewer(self, rel):
+        from pathlib import Path
+
+        v = ConfigViewer()
+        self.addCleanup(v.close)
+        v.load_file(Path("in/config/experiment") / rel, f"experiment/{rel}")
+        return v
+
+    def test_inherit_option_names_the_environment(self):
+        self.assertEqual(self.viewer("mimic/all_mimic.yaml").combo_env.itemText(0),
+                         "(inherit from base — mimic)")
+
+    def test_inherit_option_keeps_the_sentinel_in_item_data(self):
+        self.assertEqual(self.viewer("mimic/all_mimic.yaml").combo_env.itemData(0), ConfigViewer.INHERIT)
+
+    def test_env_selection_is_none_while_inherited(self):
+        self.assertIsNone(self.viewer("mimic/all_mimic.yaml").env_selection())
+
+    def test_env_selection_reports_an_explicit_choice(self):
+        viewer = self.viewer("mimic/all_mimic.yaml")
+        viewer.combo_env.setCurrentText("pyrenees")
+        self.assertEqual(viewer.env_selection(), "pyrenees")
+
+    def test_disabled_field_shows_the_value_the_base_pins(self):
+        viewer = self.viewer("mimic/all_mimic.yaml")
+        self.assertEqual(viewer.spin_intervals.value(), 1)
+        self.assertEqual(viewer.spin_eval_ep.value(), 0)
+
+    def test_disabled_field_says_where_the_value_came_from(self):
+        viewer = self.viewer("mimic/all_mimic.yaml")
+        self.assertIn("offline_rl", viewer.spin_intervals.suffix())
+
+    def test_enabled_fields_carry_no_suffix(self):
+        viewer = self.viewer("cartpole/blending.yaml")
+        self.assertEqual(viewer.spin_intervals.suffix(), "")
+        self.assertEqual(viewer.spin_eval_ep.suffix(), "")
+
+
+@unittest.skipIf(not HAS_PYQT6, "PyQt6 not installed in current environment")
+class TestTreeToolbar(unittest.TestCase):
+    """The glyphs used before did not render in the theme font, and the title
+    elided to "EXPERIM" with five buttons beside it."""
+
+    def setUp(self):
+        from frontend.config_tree import ConfigTreeWidget
+
+        self.widget = ConfigTreeWidget(mode="experiments")
+        self.addCleanup(self.widget.close)
+
+    def test_icon_buttons_have_icons_not_unrenderable_glyphs(self):
+        for name in ("btn_refresh", "btn_collapse", "btn_expand"):
+            button = getattr(self.widget, name)
+            self.assertFalse(button.icon().isNull(), f"{name} has no icon")
+            self.assertEqual(button.text(), "", f"{name} still carries glyph text")
+
+    def test_every_toolbar_button_explains_itself(self):
+        for name in ("btn_refresh", "btn_collapse", "btn_expand", "btn_new", "btn_duplicate"):
+            self.assertTrue(getattr(self.widget, name).toolTip(), f"{name} has no tooltip")
+
+    def test_title_is_on_its_own_row(self):
+        self.assertEqual(self.widget.layout().itemAt(0).widget().text(), "EXPERIMENTS")
+
+
 if __name__ == "__main__":
     unittest.main()

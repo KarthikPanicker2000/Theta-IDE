@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QStyle,
     QToolButton,
     QTreeWidget,
     QTreeWidgetItem,
@@ -155,9 +156,9 @@ class ConfigTreeWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
 
-        # Header with title and actions
-        header = QHBoxLayout()
-        header.setSpacing(4)
+        # Title on its own row. With five buttons beside it the title elided to
+        # "EXPERIM" at the panel's 220px minimum, and the two widest buttons
+        # collapsed to "...".
         if self.mode in ("experiments", "experiment"):
             title_text = "EXPERIMENTS"
         elif self.mode == "components":
@@ -165,28 +166,38 @@ class ConfigTreeWidget(QWidget):
         else:
             title_text = "CONFIG REPOSITORY"
         title = label(title_text, "eyebrow")
-        header.addWidget(title)
-        header.addStretch()
+        layout.addWidget(title)
+
+        header = QHBoxLayout()
+        header.setSpacing(4)
+
+        def icon(name, fallback):
+            """A themed standard icon; the glyphs used before did not render in
+            the theme font and showed as boxes."""
+            pixmap = getattr(QStyle.StandardPixmap, name, None)
+            return self.style().standardIcon(pixmap) if pixmap is not None else fallback
 
         self.btn_refresh = QToolButton()
-        self.btn_refresh.setText("↺")
+        self.btn_refresh.setIcon(icon("SP_BrowserReload", None))
         self.btn_refresh.setToolTip("Reload configuration files from disk")
         self.btn_refresh.clicked.connect(self.populate)
         header.addWidget(self.btn_refresh)
 
         self.btn_collapse = QToolButton()
-        self.btn_collapse.setText("⊟")
+        self.btn_collapse.setIcon(icon("SP_TitleBarShadeButton", None))
         self.btn_collapse.setToolTip("Collapse all folders in the tree")
         self.btn_collapse.clicked.connect(self.collapse_all)
         self.btn_collapse_all = self.btn_collapse  # alias
         header.addWidget(self.btn_collapse)
 
         self.btn_expand = QToolButton()
-        self.btn_expand.setText("⊞")
+        self.btn_expand.setIcon(icon("SP_TitleBarUnshadeButton", None))
         self.btn_expand.setToolTip("Expand all folders in the tree")
         self.btn_expand.clicked.connect(self.expand_all)
         self.btn_expand_all = self.btn_expand  # alias
         header.addWidget(self.btn_expand)
+
+        header.addStretch()
 
         self.btn_new = QToolButton()
         self.btn_new.setText("+ New")
@@ -200,7 +211,7 @@ class ConfigTreeWidget(QWidget):
         header.addWidget(self.btn_new)
 
         self.btn_duplicate = QToolButton()
-        self.btn_duplicate.setText("📑 Copy")
+        self.btn_duplicate.setText("Duplicate")
         if self.mode in ("experiments", "experiment"):
             self.btn_duplicate.setToolTip("Duplicate currently selected experiment")
         elif self.mode == "components":

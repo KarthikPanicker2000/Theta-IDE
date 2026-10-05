@@ -46,6 +46,19 @@ def config_tree():
     return _CONFIG_TREE
 
 
+def _read_group_base(tree, group):
+    """The group's _base.yaml as plain data, or {} when there is none."""
+    if tree is None or not group:
+        return {}
+    path = tree.config_root / "experiment" / group / "_base.yaml"
+    if not path.is_file():
+        return {}
+    try:
+        return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return {}
+
+
 class ConfigBox(QFrame):
     """Themed card container representing a section of configuration."""
     def __init__(self, title, subtitle=None, parent=None):
@@ -196,6 +209,13 @@ class ConfigViewer(QWidget):
         parts = Path(str(self.current_rel_path or "")).parts
         return parts[1] if len(parts) > 2 and parts[0] == "experiment" else None
 
+    def env_selection(self):
+        """The chosen environment, or None when it is inherited from the base."""
+        combo = getattr(self, "combo_env", None)
+        if combo is None or combo.currentData() == self.INHERIT:
+            return None
+        return combo.currentText()
+
     def _inherited_paradigm(self):
         """The paradigm this experiment inherits from its group's _base.yaml."""
         tree, group = config_tree(), self._group_name()
@@ -255,7 +275,13 @@ class ConfigViewer(QWidget):
             self.field_widgets["paradigm"] = self.combo_paradigm
 
             self.combo_env = QComboBox()
-            self.combo_env.addItem(self.INHERIT)
+            # Name what is inherited: "(inherit from base)" alone leaves the user
+            # with no way to tell which environment the run will actually use.
+            # The sentinel lives in the item's data, so the visible label is free
+            # to name what is actually inherited.
+            inherited_env = tree.group(self._group_name() or "").env
+            inherit_label = f"(inherit from base — {inherited_env})" if inherited_env else self.INHERIT
+            self.combo_env.addItem(inherit_label, self.INHERIT)
             allowed_envs = [e.name for e in tree.environments_for(self.combo_paradigm.currentText())]
             self.combo_env.addItems(allowed_envs)
             current_env = data.get("env")
@@ -266,7 +292,7 @@ class ConfigViewer(QWidget):
                 f"(offline_only must match)"
             )
             self.combo_env.currentTextChanged.connect(
-                lambda v: self._on_field_edited("env", v) if v != self.INHERIT else None
+                lambda v: self._on_field_edited("env", v) if self.env_selection() else None
             )
             form_id.addRow("Environment", self.combo_env)
             self.field_widgets["env"] = self.combo_env
@@ -335,14 +361,24 @@ class ConfigViewer(QWidget):
         self.field_widgets["eval_episodes"] = self.spin_eval_ep
 
         # Disable fields the paradigm forbids rather than letting the pipeline
-        # reject them at launch.
+        # reject them at launch. A greyed spin box is hard to tell from an
+        # editable one in a dark theme, and leaving the widget default showing
+        # would advertise a value the run will not use, so show what the group
+        # base actually pins and say where it came from.
         if tree and paradigm in tree.paradigms:
             rules = tree.paradigms[paradigm]
+            base = _read_group_base(tree, self._group_name())
             for key, widget in (("intervals_count", self.spin_intervals),
                                 ("eval_episodes", self.spin_eval_ep)):
-                if not rules.field_enabled(key):
-                    widget.setEnabled(False)
-                    widget.setToolTip(rules.disabled_reason(key))
+                if rules.field_enabled(key):
+                    continue
+                widget.setEnabled(False)
+                if key in base:
+                    widget.setValue(int(base[key]))
+                    widget.setSuffix(f"   (fixed by {paradigm})")
+                else:
+                    widget.setSuffix(f"   (not used by {paradigm})")
+                widget.setToolTip(rules.disabled_reason(key))
 
         # Checkboxes: Tensorboard, Save Dataset, Recover
         chk_row = QHBoxLayout()
