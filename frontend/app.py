@@ -129,6 +129,7 @@ class Window(QMainWindow):
         self.theme_status = label("", "muted")
         self.statusBar().addWidget(self.theme_status)
         self.theme_manager.changed.connect(self.theme_changed)
+        self.theme_manager.committed.connect(self.persist_theme_choice)
         self.theme_changed()
         self.state_label = label("TRAINING   •   idle  ", "muted")
         self.statusBar().addPermanentWidget(self.state_label)
@@ -814,9 +815,6 @@ class Window(QMainWindow):
             theme = self.theme_manager.themes().get(theme_name)
             if theme:
                 self.select_theme(theme)
-                # Persist the selection to settings.toml
-                if hasattr(self, "settings_manager"):
-                    self.settings_manager.set("appearance", "theme", theme_name)
 
     def _on_settings_changed(self):
         """Called when settings.toml changes on disk (or when the app mutates it).
@@ -1296,6 +1294,12 @@ class Window(QMainWindow):
             action.triggered.connect(lambda _, palette=theme: self.select_theme(palette))
         self.themes_menu.addSeparator()
         self.themes_menu.addAction("Theme builder…", self.show_theme_builder)
+
+    def persist_theme_choice(self, theme_name):
+        """Record a chosen theme in settings.toml. Every way of picking a theme (View menu, Settings
+        dropdown, theme builder) ends here, so a later settings reload can't revert to a stale name."""
+        if hasattr(self, "settings_manager") and self.settings_manager.theme != theme_name:
+            self.settings_manager.set("appearance", "theme", theme_name)
 
     def select_theme(self, theme):
         try:

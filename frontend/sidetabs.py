@@ -20,13 +20,15 @@ def svg_icon(name, colors):
 
     colors maps (QIcon.Mode, QIcon.State) to a theme role such as "muted" or "accent".
     """
+    # Bundled icons win. A bare name like "plots" must not pick up a same-named file in the
+    # working directory (the repo root has a "plots" symlink, a plain text file on Windows).
     p = Path(name)
-    if p.exists() and p.is_file():
-        source_path = p
-    elif (ICON_DIR / f"{name}.svg").exists():
+    if (ICON_DIR / f"{name}.svg").is_file():
         source_path = ICON_DIR / f"{name}.svg"
-    elif (ICON_DIR / name).exists():
+    elif (ICON_DIR / name).is_file():
         source_path = ICON_DIR / name
+    elif (p.is_absolute() or p.suffix.lower() == ".svg") and p.is_file():
+        source_path = p  # explicit path, e.g. a plugin's own icon
     else:
         return QIcon()
     source = source_path.read_text(encoding="utf-8")

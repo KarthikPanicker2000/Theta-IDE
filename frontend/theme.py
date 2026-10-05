@@ -237,6 +237,7 @@ STYLE = stylesheet(DEFAULT)  # Backward-compatible default for tests and preview
 
 class ThemeManager(QObject):
     changed = pyqtSignal()
+    committed = pyqtSignal(str)  # a theme the user chose to keep (not a builder preview)
 
     def __init__(self, path, parent=None, initial_theme: str | None = None):
         super().__init__(parent)
@@ -327,3 +328,4 @@ class ThemeManager(QObject):
         write_json(self.path, {"version": 1, "selected": theme["name"], "themes": list(custom.values())})
         self.custom = custom
         self.apply(theme)
+        self.committed.emit(theme["name"])
