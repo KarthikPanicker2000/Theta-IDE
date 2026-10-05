@@ -39,6 +39,7 @@ from .tensorboard import TensorBoardPanel
 from .terminal import TerminalPanel
 from .plugins import PluginManager
 from .hub import HubClient, HubDialog
+from . import wheel_guard
 
 
 # Metrics the monitor's second chart can show: key -> (card title, chart title, subtitle, value format)
@@ -2240,6 +2241,7 @@ def main():
     app.setStyle("Fusion")
     app.setFont(QFont("Segoe UI", 10))
     app.setStyleSheet(STYLE)
+    app.wheel_guard = wheel_guard.install(app)
 
     icon_path = Path(__file__).resolve().parent / "icons" / "theta_app_icon.svg"
     if icon_path.is_file():
