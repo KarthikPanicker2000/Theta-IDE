@@ -10,7 +10,7 @@ import os
 import sys
 from pathlib import Path
 
-ICON_PATH = Path(__file__).resolve().parent / "icons" / "theta_app_icon.svg"
+ICON_PATH = Path(__file__).resolve().parent / "icons" / "theta_bracket_icon.svg"
 DESKTOP_FILE_NAME = "ThetaIDE"  # QApplication.setDesktopFileName; the Linux .desktop file must match it
 WINDOWS_APP_ID = "ThetaIDE.ResearchWorkspace"
 ICON_NAME = "thetaide"  # icon-theme name used by the .desktop entry

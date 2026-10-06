@@ -450,7 +450,7 @@ class HotkeyManager(QObject):
             key_label = self.action_key_name.replace("_", "+").title()
             timeout_ms = int(self.leader_timeout * 1000) if self.leader_timeout > 0 else 0
             sb.showMessage(
-                f"⚡ Action [{key_label}]: Press [0-9] to switch pane  (Esc or {key_label} to cancel)…",
+                f"Action [{key_label}]: Press [0-9] to switch pane  (Esc or {key_label} to cancel)…",
                 timeout_ms,
             )
 
@@ -458,7 +458,7 @@ class HotkeyManager(QObject):
         self._leader_active = False
         self._leader_timer.stop()
         sb = self.window.statusBar() if hasattr(self.window, "statusBar") else None
-        if sb and sb.currentMessage().startswith("⚡ Action"):
+        if sb and sb.currentMessage().startswith("Action ["):
             sb.clearMessage()
 
     def _on_leader_timeout(self) -> None:
