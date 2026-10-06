@@ -50,10 +50,11 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from .app_icon import DESKTOP_FILE_NAME, ICON_PATH, app_icon, install_desktop_entry, set_windows_app_id
-from .titlebar import apply_title_bar
+
+from . import wheel_guard
 from .about import AboutDialog, AsciiTheta
 from .api import DEFAULT_URL, Backend
+from .app_icon import DESKTOP_FILE_NAME, ICON_PATH, app_icon, install_desktop_entry, set_windows_app_id
 from .components_panel import ComponentsPanel
 from .config_tree import ConfigTreeWidget
 from .config_viewer import ConfigViewer
@@ -75,11 +76,12 @@ from .plots import PlotViewer
 from .plugins import PluginManager
 from .queue_panel import QueuePanel
 from .settings import SettingsManager
-from .sidetabs import SideTabs
+from .sidetabs import SideTabs, svg_icon
 from .tensorboard import TensorBoardPanel
 from .terminal import TerminalPanel
 from .theme import STYLE, ThemeManager, theme_color
 from .theme_builder import ThemeBuilder
+from .titlebar import apply_title_bar
 from .widgets import Chart, MetricCard, ToggleSlider, YamlHighlighter, label
 from .workflows import WorkflowsPanel
 
@@ -174,10 +176,14 @@ class Window(QMainWindow):
         self.init_default_experiment()
         self.tabs.tabOrderChanged.connect(lambda _: self.save_layout())
         self.load_layout()
+        if hasattr(self, "settings_manager"):
+            self.tabs.set_auto_hide(bool(self.settings_manager.get("sidebar", "auto_hide", default=False)))
+        self.tabs.autoHideChanged.connect(self.on_sidebar_auto_hide_changed)
         self.make_menus()
         self.theme_status = label("", "muted")
         self.statusBar().addWidget(self.theme_status)
         self.theme_manager.changed.connect(self.theme_changed)
+        self.theme_manager.committed.connect(self.persist_theme_choice)
         self.theme_changed()
         self.state_label = label("TRAINING   •   idle  ", "muted")
         self.statusBar().addPermanentWidget(self.state_label)
@@ -225,24 +231,21 @@ class Window(QMainWindow):
 
         actions_bar = QHBoxLayout()
         actions_bar.setSpacing(8)
-        actions_bar.addWidget(self.button("+  New in group…", self.new_experiment))
-        actions_bar.addWidget(self.button("📑  Duplicate…", self.duplicate_experiment))
-        self.start_button = self.button("▶  Launch training", self.launch_training, True)
+        self.start_button = self.button("Launch training", self.launch_training, True)
         self.start_button.setToolTip("Train the loaded experiment config through the backend (F5)")
         self.start_button.setEnabled(False)
         actions_bar.addWidget(self.start_button)
-        self.queue_button = self.button("＋  Add to queue", self.add_to_queue)
+        self.queue_button = self.button("Add to queue", self.add_to_queue)
         self.queue_button.setToolTip("Queue the loaded config; queued jobs train one at a time, in order (Ctrl+Shift+Q)")
         self.queue_button.setEnabled(False)
         actions_bar.addWidget(self.queue_button)
-        self.stop_button = self.button("■  Stop", self.stop_run)
+        self.stop_button = self.button("Stop", self.stop_run)
         self.stop_button.setEnabled(False)
         actions_bar.addWidget(self.stop_button)
-        actions_bar.addWidget(self.button("💾  Save YAML", self.save_current_config))
         actions_bar.addWidget(self.button("Export recipe YAML…", self.export_config))
         actions_bar.addStretch()
 
-        self.btn_toggle_yaml = QPushButton("{ }  View Hydra YAML")
+        self.btn_toggle_yaml = QPushButton("View Hydra YAML")
         self.btn_toggle_yaml.setCheckable(True)
         self.btn_toggle_yaml.setChecked(False)
         self.btn_toggle_yaml.setToolTip("Toggle preview of the resolved Hydra YAML configuration")
@@ -342,23 +345,23 @@ class Window(QMainWindow):
         self.run_combo.currentIndexChanged.connect(self.on_run_combo_changed)
         nav_row.addWidget(self.run_combo, 1)
 
-        self.btn_prev_run = QPushButton("◀ Prev")
+        self.btn_prev_run = QPushButton("Previous")
         self.btn_prev_run.setToolTip("View previous experiment run in history")
         self.btn_prev_run.clicked.connect(self.select_prev_run)
         nav_row.addWidget(self.btn_prev_run)
 
-        self.btn_next_run = QPushButton("Next ▶")
+        self.btn_next_run = QPushButton("Next")
         self.btn_next_run.setToolTip("View next experiment run in history")
         self.btn_next_run.clicked.connect(self.select_next_run)
         nav_row.addWidget(self.btn_next_run)
 
-        self.btn_live_jump = QPushButton("🟢 Jump to Live")
+        self.btn_live_jump = QPushButton("Jump to live")
         self.btn_live_jump.setToolTip("Return view to the currently training run")
         self.btn_live_jump.clicked.connect(self.jump_to_live_run)
         self.btn_live_jump.hide()
         nav_row.addWidget(self.btn_live_jump)
 
-        self.btn_pin_baseline = QPushButton("📌 Pin as Baseline")
+        self.btn_pin_baseline = QPushButton("Pin as baseline")
         self.btn_pin_baseline.setCheckable(True)
         self.btn_pin_baseline.setToolTip("Pin this run to overlay as a dashed baseline curve on other runs")
         self.btn_pin_baseline.clicked.connect(self.toggle_pin_baseline)
@@ -372,7 +375,7 @@ class Window(QMainWindow):
         caption_row = QHBoxLayout()
         self.run_caption = label("Configure an experiment, then launch training.", "muted")
         caption_row.addWidget(self.run_caption, 1)
-        self.storage_label = label("📁 results/logs/  •  🗄️ results/jobs/jobs.db", "muted")
+        self.storage_label = label("results/logs/  ·  results/jobs/jobs.db", "muted")
         caption_row.addWidget(self.storage_label)
         layout.addLayout(caption_row)
         row = QHBoxLayout()
@@ -400,7 +403,7 @@ class Window(QMainWindow):
         self.monitor_note.setWordWrap(True)
         monitor_footer = QHBoxLayout()
         monitor_footer.addWidget(self.monitor_note, 1)
-        monitor_footer.addWidget(self.button("Open TensorBoard  →", self.show_tensorboard))
+        monitor_footer.addWidget(self.button("Open TensorBoard", self.show_tensorboard))
         layout.addLayout(monitor_footer)
         self.monitor_panel = monitor
         self.tabs.addTab(self.monitor_panel, "Training monitor", "monitor", "Monitor", tab_id="monitor")
@@ -571,9 +574,6 @@ class Window(QMainWindow):
             theme = self.theme_manager.themes().get(theme_name)
             if theme:
                 self.select_theme(theme)
-                # Persist the selection to settings.toml
-                if hasattr(self, "settings_manager"):
-                    self.settings_manager.set("appearance", "theme", theme_name)
 
     def _on_settings_changed(self):
         """Called when settings.toml changes on disk (or when the app mutates it).
@@ -656,6 +656,18 @@ class Window(QMainWindow):
             return self.hotkey_manager.switch_to_pane(str(target))
         return False
 
+    def on_sidebar_auto_hide_changed(self, enabled):
+        """Keep the menu item and the Settings switch in step, and remember the choice."""
+        for control in (getattr(self, "auto_hide_action", None), getattr(self, "auto_hide_slider", None)):
+            if control is not None and control.isChecked() != enabled:
+                control.blockSignals(True)
+                control.setChecked(enabled)
+                control.blockSignals(False)
+        if hasattr(self, "settings_manager"):
+            self.settings_manager.set("sidebar", "auto_hide", enabled)
+        self.statusBar().showMessage(
+            "Sidebar auto-hide on: hover the left edge to show it." if enabled else "Sidebar docked.", 4000)
+
     def on_pane_slider_toggled(self, pane_id, checked):
         visible_count = sum(1 for s in self.pane_sliders.values() if s.isChecked())
         if not checked and visible_count == 0:
@@ -735,14 +747,10 @@ class Window(QMainWindow):
 
         if has_settings:
             btn_settings = QToolButton()
-            btn_settings.setText("⚙")
+            btn_settings.setIcon(svg_icon("settings", {(QIcon.Mode.Normal, QIcon.State.Off): "text"}))
             btn_settings.setToolTip(f"{manifest.name} Settings")
-            btn_settings.setFixedSize(28, 28)
+            btn_settings.setFixedSize(30, 30)
             btn_settings.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn_settings.setStyleSheet(
-                "QToolButton { border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; background: rgba(255, 255, 255, 0.04); font-size: 16px; } "
-                "QToolButton:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.3); }"
-            )
             btn_settings.clicked.connect(lambda _, p=pid: self.open_plugin_settings(p))
             row.addWidget(btn_settings)
 
@@ -1086,6 +1094,10 @@ class Window(QMainWindow):
         view_menu.addAction("Console", lambda: self.tabs.setCurrentWidget(self.console_panel))
         view_menu.addAction("Settings & About", lambda: self.tabs.setCurrentWidget(self.settings_panel))
         view_menu.addAction("Restore default layout", lambda: self.restoreState(self.default_layout))
+        self.auto_hide_action = QAction("Auto-hide sidebar", self, checkable=True)
+        self.auto_hide_action.setChecked(self.tabs.auto_hide)
+        self.auto_hide_action.toggled.connect(lambda on: self.tabs.set_auto_hide(on))
+        view_menu.addAction(self.auto_hide_action)
         view_menu.addSeparator()
         view_menu.addAction("Preferences: Open Settings File", self.open_settings_file)
         help_menu = self.menuBar().addMenu("Help")
@@ -1130,6 +1142,10 @@ class Window(QMainWindow):
         self.theme_status.setText(f"  ●  Local workspace    /    {self.theme_manager.active['name']}")
         self.highlighter.rehighlight()
         self.tabs.refresh_icons()
+        for tree in (getattr(self, "config_tree", None),
+                     getattr(getattr(self, "components_panel", None), "components_tree", None)):
+            if tree is not None:
+                tree.refresh_icons()
         if hasattr(self, "settings_theme_select"):
             self.settings_theme_select.blockSignals(True)
             self.settings_theme_select.setCurrentText(self.theme_manager.active["name"])
@@ -1158,6 +1174,12 @@ class Window(QMainWindow):
             action.triggered.connect(lambda _, palette=theme: self.select_theme(palette))
         self.themes_menu.addSeparator()
         self.themes_menu.addAction("Theme builder…", self.show_theme_builder)
+
+    def persist_theme_choice(self, theme_name):
+        """Record a chosen theme in settings.toml. Every way of picking a theme (View menu, Settings
+        dropdown, theme builder) ends here, so a later settings reload can't revert to a stale name."""
+        if hasattr(self, "settings_manager") and self.settings_manager.theme != theme_name:
+            self.settings_manager.set("appearance", "theme", theme_name)
 
     def select_theme(self, theme):
         try:
@@ -1803,15 +1825,15 @@ class Window(QMainWindow):
         if hasattr(self, "storage_label"):
             if live:
                 where = f"results/logs/{run['backend']['group']}/{run['backend']['experiment_id']}/"
-                self.storage_label.setText(f"📁 {where}  •  🗄️ results/jobs/jobs.db")
+                self.storage_label.setText(f"{where}  ·  results/jobs/jobs.db")
             else:
-                self.storage_label.setText("📁 Simulated demo run (in-memory)  •  🗄️ results/jobs/jobs.db")
+                self.storage_label.setText("Simulated demo run (in-memory)  ·  results/jobs/jobs.db")
 
         # Update Live Jump button
         if hasattr(self, "btn_live_jump"):
             if self.active and self.selected != self.active:
                 live_id = self.active["backend"]["experiment_id"] if not self.active["simulated"] else self.active["config"]["name"]
-                chip_text = f"🟢 Jump to Live ({live_id[:14]}…)" if len(live_id) > 14 else f"🟢 Jump to Live ({live_id})"
+                chip_text = f"Jump to live ({live_id[:14]}…)" if len(live_id) > 14 else f"Jump to live ({live_id})"
                 self.btn_live_jump.setText(chip_text)
                 self.btn_live_jump.show()
             else:
@@ -1821,17 +1843,17 @@ class Window(QMainWindow):
         if hasattr(self, "btn_pin_baseline"):
             if self.pinned_baseline_run is None:
                 self.btn_pin_baseline.setChecked(False)
-                self.btn_pin_baseline.setText("📌 Pin as Baseline")
+                self.btn_pin_baseline.setText("Pin as baseline")
                 self.btn_pin_baseline.setToolTip("Pin this run's curve to overlay as a dashed baseline when inspecting other runs")
             elif self.pinned_baseline_run is run:
                 self.btn_pin_baseline.setChecked(True)
-                self.btn_pin_baseline.setText("📌 Pinned Baseline")
+                self.btn_pin_baseline.setText("Pinned baseline")
                 self.btn_pin_baseline.setToolTip("This run is currently pinned as the baseline. Click to unpin.")
             else:
                 self.btn_pin_baseline.setChecked(False)
                 p_name = self.pinned_baseline_run["backend"]["experiment_id"] if not self.pinned_baseline_run["simulated"] else self.pinned_baseline_run["config"]["name"]
                 label_name = (p_name[:12] + "…") if len(p_name) > 12 else p_name
-                self.btn_pin_baseline.setText(f"📌 Replace Baseline ({label_name})")
+                self.btn_pin_baseline.setText(f"Replace baseline ({label_name})")
                 self.btn_pin_baseline.setToolTip(f"Baseline '{p_name}' is pinned. Click to replace it with this run.")
 
         # Update Prev/Next button states
@@ -1936,11 +1958,11 @@ class Window(QMainWindow):
                 name = config["name"] if run["simulated"] else run["backend"]["experiment_id"]
                 status = run.get("status", "")
                 if status in LIVE_STATUSES:
-                    icon = "🟢 "
+                    icon = "● "
                 elif status == "completed":
                     icon = "✓ "
                 elif status in ("failed", "interrupted", "stopped"):
-                    icon = "✖ "
+                    icon = "✗ "
                 else:
                     icon = "○ "
                 last_reward = latest(run, "reward")
@@ -2136,6 +2158,7 @@ def main():
     app.setStyle("Fusion")
     app.setFont(QFont("Segoe UI", 10))
     app.setStyleSheet(STYLE)
+    app.wheel_guard = wheel_guard.install(app)
 
     if ICON_PATH.is_file():
         app.setWindowIcon(app_icon())  # every window's title bar, the taskbar and (macOS) the Dock

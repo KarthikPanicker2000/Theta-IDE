@@ -1,10 +1,12 @@
 """Full-screen, simplified, boxed configuration viewer for Theta-IDE."""
+import math
 import random
 from pathlib import Path
 
 import yaml
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
+    QAbstractSpinBox,
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
@@ -25,6 +27,35 @@ from PyQt6.QtWidgets import (
 
 from .config_model import ConfigTree
 from .widgets import ComboBox, DoubleSpinBox, SpinBox, label
+
+# Forms stay readable on wide windows: the column of boxes stops growing past CONTENT_WIDTH,
+# and fields in label/field rows are capped by kind so a number doesn't get a 1,000px box.
+CONTENT_WIDTH = 860
+NUMBER_FIELD_WIDTH = 200
+TEXT_FIELD_WIDTH = 380
+
+
+class CompactDoubleSpinBox(DoubleSpinBox):
+    """Keeps six decimals of precision but shows 0.95 rather than 0.950000."""
+
+    def textFromValue(self, value):
+        text = f"{value:.{self.decimals()}f}".rstrip("0").rstrip(".")
+        return "0" if text in ("", "-0") else text
+
+
+def number_field(value):
+    """Spin box for a YAML number: floats step at one tenth of their magnitude, and values
+    that start non-negative (counts, coefficients) can't be pushed below zero."""
+    if isinstance(value, float):
+        spin = CompactDoubleSpinBox()
+        spin.setDecimals(6)
+        magnitude = math.floor(math.log10(abs(value))) if value else -1
+        spin.setSingleStep(10.0 ** (magnitude - 1))
+    else:
+        spin = SpinBox()
+    spin.setRange(0 if value >= 0 else -1000000, 100000000)
+    spin.setValue(value)
+    return spin
 
 _CONFIG_TREE = None
 _CONFIG_TREE_LOADED = False
@@ -131,7 +162,7 @@ class ConfigViewer(QWidget):
 
         hb_layout.addStretch()
 
-        self.btn_save = QPushButton("💾 Save")
+        self.btn_save = QPushButton("Save")
         self.btn_save.setToolTip("Save changes to this configuration file (Ctrl+S)")
         self.btn_save.clicked.connect(self.save_to_disk)
         self.btn_save.setEnabled(False)
@@ -145,6 +176,7 @@ class ConfigViewer(QWidget):
         self.scroll.setObjectName("configScrollArea")
 
         self.container = QWidget()
+        self.container.setMaximumWidth(CONTENT_WIDTH)
         self.boxes_layout = QVBoxLayout(self.container)
         self.boxes_layout.setContentsMargins(12, 10, 12, 16)
         self.boxes_layout.setSpacing(14)
@@ -201,6 +233,7 @@ class ConfigViewer(QWidget):
         else:
             self._render_generic_boxes()
 
+        self._cap_form_fields()
         self.boxes_layout.addStretch()
         self._block_updates = False
 
@@ -222,6 +255,36 @@ class ConfigViewer(QWidget):
         if tree is None or group is None:
             return None
         return tree.group(group).paradigm
+
+    def _cap_form_fields(self):
+        """Limit field widths in every label/field form and two-column grid."""
+        for grid in self.container.findChildren(QGridLayout):
+            for index in range(grid.count()):
+                widget = grid.itemAt(index).widget()
+                if isinstance(widget, QAbstractSpinBox):
+                    widget.setMaximumWidth(NUMBER_FIELD_WIDTH)
+                elif isinstance(widget, (QComboBox, QLineEdit)):
+                    widget.setMaximumWidth(NUMBER_FIELD_WIDTH)
+            # An empty last column takes the slack, so fields stay next to their labels
+            grid.setColumnStretch(grid.columnCount(), 1)
+        for row_layout in self.container.findChildren(QHBoxLayout):
+            for index in range(row_layout.count()):
+                widget = row_layout.itemAt(index).widget()
+                if isinstance(widget, QAbstractSpinBox):
+                    widget.setMaximumWidth(NUMBER_FIELD_WIDTH)
+        for form in self.container.findChildren(QFormLayout):
+            for row in range(form.rowCount()):
+                item = form.itemAt(row, QFormLayout.ItemRole.FieldRole)
+                widget = item.widget() if item else None
+                label_item = form.itemAt(row, QFormLayout.ItemRole.LabelRole)
+                if widget is not None and label_item and isinstance(label_item.widget(), QLabel):
+                    # Labels sit at the top of their row; match the field height so the text lines up
+                    label_item.widget().setMinimumHeight(widget.sizeHint().height())
+                    label_item.widget().setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+                if isinstance(widget, QAbstractSpinBox):
+                    widget.setMaximumWidth(NUMBER_FIELD_WIDTH)
+                elif isinstance(widget, (QComboBox, QLineEdit)):
+                    widget.setMaximumWidth(TEXT_FIELD_WIDTH)
 
     def _render_experiment_boxes(self):
         """Render standard boxes for an Experiment configuration."""
@@ -336,10 +399,11 @@ class ConfigViewer(QWidget):
         self.field_widgets["seed"] = self.spin_seed
 
         btn_rand_seed = QToolButton()
-        btn_rand_seed.setText("🎲")
+        btn_rand_seed.setText("Random")
         btn_rand_seed.setToolTip("Pick a random seed")
         btn_rand_seed.clicked.connect(lambda: self.spin_seed.setValue(random.randint(1, 9999)))
         seed_row.addWidget(btn_rand_seed)
+        seed_row.addStretch()
         form_budget.addLayout(seed_row, 0, 3)
 
         # Intervals count
@@ -403,6 +467,7 @@ class ConfigViewer(QWidget):
         self.chk_no_plot.toggled.connect(lambda v: self._on_field_edited("no_plot", v))
         chk_row.addWidget(self.chk_no_plot)
 
+        chk_row.addStretch()
         form_budget.addLayout(chk_row, 2, 0, 1, 4)
 
         box_budget.add_layout(form_budget)
@@ -437,7 +502,7 @@ class ConfigViewer(QWidget):
                 sc_layout = QFormLayout(sub_card)
                 sc_layout.setVerticalSpacing(8)
 
-                title_lbl = label(f"Method: {m_name}", "heading")
+                title_lbl = label(f"Method: {m_name}", "cardTitle")
                 sc_layout.addRow(title_lbl)
 
                 # Agent — restricted to what this paradigm permits
@@ -492,7 +557,7 @@ class ConfigViewer(QWidget):
 
                 # Learning rate
                 if "lr" in m_spec:
-                    spin_lr = DoubleSpinBox()
+                    spin_lr = CompactDoubleSpinBox()
                     spin_lr.setDecimals(6)
                     spin_lr.setRange(0.000001, 1.0)
                     spin_lr.setSingleStep(0.0001)
@@ -623,11 +688,7 @@ class ConfigViewer(QWidget):
                     chk.toggled.connect(lambda val, key=k: self._on_field_edited(key, val))
                     form.addRow(k, chk)
                 elif isinstance(v, (int, float)):
-                    spin = DoubleSpinBox() if isinstance(v, float) else SpinBox()
-                    spin.setRange(-1000000, 100000000)
-                    if isinstance(v, float):
-                        spin.setDecimals(6)
-                    spin.setValue(v)
+                    spin = number_field(v)
                     spin.valueChanged.connect(lambda val, key=k: self._on_field_edited(key, val))
                     form.addRow(k, spin)
                 else:

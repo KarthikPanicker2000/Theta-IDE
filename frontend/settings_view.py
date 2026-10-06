@@ -312,7 +312,7 @@ class SettingsDetailWindow(QFrame):
         # Prominent Close button
         self.btn_close = QToolButton()
         self.btn_close.setObjectName("settingsCloseButton")
-        self.btn_close.setText("✕ Close")
+        self.btn_close.setText("Close")
         self.btn_close.setToolTip("Close settings (Return to ASCII Theta)")
         self.btn_close.setFixedHeight(30)
         self.btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -605,7 +605,7 @@ class SettingsView(QWidget):
         tc_layout.setContentsMargins(16, 14, 16, 14)
         tc_layout.setSpacing(10)
 
-        tc_layout.addWidget(label("Color Theme & Palette", "heading"))
+        tc_layout.addWidget(label("Color Theme & Palette", "cardTitle"))
         tc_sub = label("Select an active color palette or create custom theme roles.", "muted")
         tc_sub.setWordWrap(True)
         tc_layout.addWidget(tc_sub)
@@ -617,12 +617,14 @@ class SettingsView(QWidget):
             self.window.settings_theme_select.addItem(name)
         self.window.settings_theme_select.setCurrentText(self.window.theme_manager.active["name"])
         self.window.settings_theme_select.currentTextChanged.connect(self.window.settings_theme_selected)
+        self.window.settings_theme_select.setMaximumWidth(320)
         theme_row.addWidget(self.window.settings_theme_select, 1)
 
         btn_builder = QPushButton("Customize palette…")
         btn_builder.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_builder.clicked.connect(self.window.show_theme_builder)
         theme_row.addWidget(btn_builder)
+        theme_row.addStretch()
         tc_layout.addLayout(theme_row)
         layout.addWidget(theme_card)
 
@@ -633,7 +635,7 @@ class SettingsView(QWidget):
         sb_layout.setContentsMargins(16, 14, 16, 14)
         sb_layout.setSpacing(10)
 
-        sb_layout.addWidget(label("Sidebar Panels Visibility", "heading"))
+        sb_layout.addWidget(label("Sidebar Panels Visibility", "cardTitle"))
         sb_sub = label("Choose which navigation panels are visible in the left sidebar.", "muted")
         sb_sub.setWordWrap(True)
         sb_layout.addWidget(sb_sub)
@@ -678,6 +680,24 @@ class SettingsView(QWidget):
 
         sb_layout.addLayout(panes_grid)
 
+        auto_hide_row = QHBoxLayout()
+        auto_hide_info = QVBoxLayout()
+        auto_hide_info.setSpacing(1)
+        auto_hide_title = label("Auto-hide sidebar")
+        auto_hide_title.setStyleSheet("font-weight: 500; font-size: 12px;")
+        auto_hide_info.addWidget(auto_hide_title)
+        auto_hide_sub = label("Tuck the sidebar into a thin left edge; hover the edge to slide it out.", "muted")
+        auto_hide_sub.setWordWrap(True)
+        auto_hide_info.addWidget(auto_hide_sub)
+        auto_hide_row.addLayout(auto_hide_info, 1)
+        self.window.auto_hide_slider = ToggleSlider(
+            checked=bool(self.window.settings_manager.get("sidebar", "auto_hide", default=False)))
+        self.window.auto_hide_slider.setToolTip("Hide the sidebar until you hover the left edge")
+        self.window.auto_hide_slider.setAccessibleName("Toggle sidebar auto-hide")
+        self.window.auto_hide_slider.toggled.connect(lambda on: self.window.tabs.set_auto_hide(on))
+        auto_hide_row.addWidget(self.window.auto_hide_slider)
+        sb_layout.addLayout(auto_hide_row)
+
         sb_btn_row = QHBoxLayout()
         btn_reset_sidebar = QPushButton("Restore default sidebar")
         btn_reset_sidebar.setToolTip("Show all panels and restore original sidebar order")
@@ -696,7 +716,7 @@ class SettingsView(QWidget):
         sc_layout.setContentsMargins(16, 14, 16, 14)
         sc_layout.setSpacing(8)
 
-        sc_layout.addWidget(label("3D ASCII Sculpture Animation", "heading"))
+        sc_layout.addWidget(label("3D ASCII Sculpture Animation", "cardTitle"))
         sc_sub = label("Configure the software-rendered rotating ASCII Theta sculpture.", "muted")
         sc_sub.setWordWrap(True)
         sc_layout.addWidget(sc_sub)
@@ -751,7 +771,7 @@ class SettingsView(QWidget):
         c_layout.setContentsMargins(18, 16, 18, 16)
         c_layout.setSpacing(12)
 
-        c_layout.addWidget(label("Built-in Core Plugins", "heading"))
+        c_layout.addWidget(label("Built-in Core Plugins", "cardTitle"))
         sub = label("Core extensions bundled natively into Theta-IDE.", "muted")
         sub.setWordWrap(True)
         c_layout.addWidget(sub)
@@ -797,9 +817,9 @@ class SettingsView(QWidget):
         pc_layout.setSpacing(12)
 
         header_row = QHBoxLayout()
-        header_row.addWidget(label("Community Plugins & Extensions", "heading"), 1)
+        header_row.addWidget(label("Community Plugins & Extensions", "cardTitle"), 1)
 
-        btn_browse_hub = QPushButton("🌐 Browse Community Hub…")
+        btn_browse_hub = QPushButton("Browse Community Hub…")
         btn_browse_hub.setToolTip("Explore and install community plugins, RL methods, and models")
         btn_browse_hub.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_browse_hub.clicked.connect(lambda: self.window.open_hub("plugin"))
@@ -834,7 +854,7 @@ class SettingsView(QWidget):
         ak_layout.setContentsMargins(18, 16, 18, 16)
         ak_layout.setSpacing(12)
 
-        ak_layout.addWidget(label("Action Key & Terminal Precedence", "heading"))
+        ak_layout.addWidget(label("Action Key & Terminal Precedence", "cardTitle"))
         sub = label("Select the primary leader key used to trigger navigation chords, and manage terminal precedence.", "muted")
         ak_layout.addWidget(sub)
 
@@ -856,7 +876,9 @@ class SettingsView(QWidget):
             self.window.settings_action_key_combo.addItem(custom_title, cur_action_key)
             self.window.settings_action_key_combo.setCurrentText(custom_title)
         self.window.settings_action_key_combo.currentIndexChanged.connect(self._on_action_preset_changed)
+        self.window.settings_action_key_combo.setMaximumWidth(320)
         ak_row.addWidget(self.window.settings_action_key_combo, 1)
+        ak_row.addStretch()
         ak_layout.addLayout(ak_row)
 
         # 2. Terminal precedence toggle
@@ -884,7 +906,7 @@ class SettingsView(QWidget):
         pc_layout.setContentsMargins(18, 16, 18, 16)
         pc_layout.setSpacing(12)
 
-        pc_layout.addWidget(label("Pane Navigation Hotkey Menu", "heading"))
+        pc_layout.addWidget(label("Pane Navigation Hotkey Menu", "cardTitle"))
         pc_sub = label(
             "Assign hotkeys (e.g. Action + 1, Action + T) to IDE panels. "
             "Click an input and press a key to record, or Backspace to clear. "
@@ -907,10 +929,6 @@ class SettingsView(QWidget):
         banner_layout = QHBoxLayout(self.conflict_banner)
         banner_layout.setContentsMargins(8, 6, 8, 6)
         banner_layout.setSpacing(10)
-
-        warn_icon = label("⚠️")
-        warn_icon.setStyleSheet("font-size: 18px;")
-        banner_layout.addWidget(warn_icon, 0, Qt.AlignmentFlag.AlignTop)
 
         self.conflict_banner_label = label("", "danger")
         self.conflict_banner_label.setWordWrap(True)
@@ -1035,7 +1053,7 @@ class SettingsView(QWidget):
         mc_layout.setContentsMargins(18, 16, 18, 16)
         mc_layout.setSpacing(12)
 
-        mc_layout.addWidget(label("Application Menu Shortcuts", "heading"))
+        mc_layout.addWidget(label("Application Menu Shortcuts", "cardTitle"))
         mc_sub = label(
             "Global shortcuts accessible anywhere in Theta-IDE. Click any shortcut to record a new key combination:",
             "muted",
@@ -1228,7 +1246,7 @@ class SettingsView(QWidget):
                     names = " and ".join(t for _, t in p_list)
                     conflict_details.append(f"• <b>{combo}</b> is assigned to <b>{names}</b>")
                 self.conflict_banner_label.setText(
-                    "<b>⚠️ Hotkey Conflict Detected:</b> Multiple panels share the same shortcut:<br>"
+                    "<b>Hotkey conflict:</b> Multiple panels share the same shortcut:<br>"
                     + "<br>".join(conflict_details)
                     + "<br><span style='font-size: 11px; opacity: 0.8;'>Conflicting shortcuts will only navigate to the first matching panel.</span>"
                 )
@@ -1252,7 +1270,7 @@ class SettingsView(QWidget):
                     "color: #ff9999; border-radius: 4px; padding: 4px 8px;"
                 )
                 if warn_lbl:
-                    warn_lbl.setText(f"⚠️ Conflict: Also assigned to {other_str}")
+                    warn_lbl.setText(f"Conflict: also assigned to {other_str}")
                     warn_lbl.setVisible(True)
             else:
                 edit.setStyleSheet(
@@ -1410,7 +1428,7 @@ class SettingsView(QWidget):
         bc_layout.setContentsMargins(18, 16, 18, 16)
         bc_layout.setSpacing(12)
 
-        bc_layout.addWidget(label("FastAPI Backend Service", "heading"))
+        bc_layout.addWidget(label("FastAPI Backend Service", "cardTitle"))
         bc_sub = label("The backend daemon manages training runs, sweeps, and job orchestration.", "muted")
         bc_layout.addWidget(bc_sub)
 
@@ -1421,13 +1439,13 @@ class SettingsView(QWidget):
         self.window.settings_backend_status.setStyleSheet("font-size: 12px; font-weight: 600;")
         status_box.addWidget(self.window.settings_backend_status, 1)
 
-        btn_test = QPushButton("⚡ Test connection")
+        btn_test = QPushButton("Test connection")
         btn_test.setToolTip("Ping the FastAPI daemon health check endpoint")
         btn_test.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_test.clicked.connect(self.window.test_backend_connection)
         status_box.addWidget(btn_test)
 
-        btn_docs = QPushButton("📖 Swagger docs ↗")
+        btn_docs = QPushButton("Swagger docs")
         btn_docs.setToolTip("Open interactive API documentation in your web browser")
         btn_docs.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_docs.clicked.connect(self.window.open_swagger_docs)
@@ -1445,7 +1463,9 @@ class SettingsView(QWidget):
         self.window.settings_backend_url = QLineEdit(self.window.backend.base_url)
         self.window.settings_backend_url.setReadOnly(True)
         self.window.settings_backend_url.setStyleSheet("font-family: 'Consolas', monospace; font-size: 12px;")
+        self.window.settings_backend_url.setMaximumWidth(320)
         url_row.addWidget(self.window.settings_backend_url, 1)
+        url_row.addStretch()
         bc_layout.addLayout(url_row)
 
         # CLI tip
@@ -1473,7 +1493,7 @@ class SettingsView(QWidget):
         sc_layout.setContentsMargins(18, 16, 18, 16)
         sc_layout.setSpacing(12)
 
-        sc_layout.addWidget(label("Workspace & Storage", "heading"))
+        sc_layout.addWidget(label("Workspace & Storage", "cardTitle"))
         sc_sub = label("Manage local experiment databases, filesystems, and layout preferences.", "muted")
         sc_sub.setWordWrap(True)
         sc_layout.addWidget(sc_sub)
@@ -1511,7 +1531,7 @@ class SettingsView(QWidget):
         btn_row = QHBoxLayout()
         btn_row.setSpacing(10)
 
-        btn_open_settings = QPushButton("📄 Open settings.toml ↗")
+        btn_open_settings = QPushButton("Open settings.toml")
         btn_open_settings.setToolTip(
             f"Open settings file in your default editor\n{self.window.settings_manager.workspace_settings_path}"
         )
@@ -1519,7 +1539,7 @@ class SettingsView(QWidget):
         btn_open_settings.clicked.connect(self.window.open_settings_file)
         btn_row.addWidget(btn_open_settings)
 
-        btn_reset_layout = QPushButton("↺ Reset UI layout")
+        btn_reset_layout = QPushButton("Reset UI layout")
         btn_reset_layout.setToolTip("Restore default pane sizes and layout")
         btn_reset_layout.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_reset_layout.clicked.connect(

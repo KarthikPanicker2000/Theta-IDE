@@ -2,7 +2,8 @@
 from pathlib import Path
 
 import yaml
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -24,7 +25,14 @@ from PyQt6.QtWidgets import (
 )
 
 from .config_model import ConfigTree, experiment_yaml, group_base_yaml
+from .sidetabs import svg_icon
 from .widgets import label
+
+TOOL_ICON_COLORS = {
+    (QIcon.Mode.Normal, QIcon.State.Off): "text",
+    (QIcon.Mode.Active, QIcon.State.Off): "accent",
+    (QIcon.Mode.Disabled, QIcon.State.Off): "disabled",
+}
 
 
 class NewExperimentDialog(QDialog):
@@ -123,17 +131,6 @@ def find_config_root():
     return (Path(__file__).resolve().parent.parent / "in" / "config").resolve()
 
 
-FOLDER_ICONS = {
-    "experiment": "🧪",
-    "agent": "🤖",
-    "env": "🌐",
-    "model": "🧠",
-    "paradigms": "⚙️",
-    "site": "🖥️",
-    "hydra": "⚡",
-}
-
-
 class ConfigTreeWidget(QWidget):
     """File tree that mirrors in/config/ and allows selecting, duplicating,
 
@@ -171,27 +168,18 @@ class ConfigTreeWidget(QWidget):
         header = QHBoxLayout()
         header.setSpacing(4)
 
-        def icon(name, fallback):
-            """A themed standard icon; the glyphs used before did not render in
-            the theme font and showed as boxes."""
-            pixmap = getattr(QStyle.StandardPixmap, name, None)
-            return self.style().standardIcon(pixmap) if pixmap is not None else fallback
-
-        self.btn_refresh = QToolButton()
-        self.btn_refresh.setIcon(icon("SP_BrowserReload", None))
+        self.btn_refresh = self._tool_button("reload")
         self.btn_refresh.setToolTip("Reload configuration files from disk")
         self.btn_refresh.clicked.connect(self.populate)
         header.addWidget(self.btn_refresh)
 
-        self.btn_collapse = QToolButton()
-        self.btn_collapse.setIcon(icon("SP_TitleBarShadeButton", None))
+        self.btn_collapse = self._tool_button("collapse_all")
         self.btn_collapse.setToolTip("Collapse all folders in the tree")
         self.btn_collapse.clicked.connect(self.collapse_all)
         self.btn_collapse_all = self.btn_collapse  # alias
         header.addWidget(self.btn_collapse)
 
-        self.btn_expand = QToolButton()
-        self.btn_expand.setIcon(icon("SP_TitleBarUnshadeButton", None))
+        self.btn_expand = self._tool_button("expand_all")
         self.btn_expand.setToolTip("Expand all folders in the tree")
         self.btn_expand.clicked.connect(self.expand_all)
         self.btn_expand_all = self.btn_expand  # alias
@@ -199,8 +187,7 @@ class ConfigTreeWidget(QWidget):
 
         header.addStretch()
 
-        self.btn_new = QToolButton()
-        self.btn_new.setText("+ New")
+        self.btn_new = self._tool_button("new_file", "New")
         if self.mode == "components":
             self.btn_new.setToolTip("Create a new modular component (agent, env, model, etc.)")
             self.btn_new.clicked.connect(self.prompt_new_component)
@@ -210,8 +197,7 @@ class ConfigTreeWidget(QWidget):
         self.btn_new_group = self.btn_new  # backwards compatibility alias
         header.addWidget(self.btn_new)
 
-        self.btn_duplicate = QToolButton()
-        self.btn_duplicate.setText("Duplicate")
+        self.btn_duplicate = self._tool_button("copy", "Copy")
         if self.mode in ("experiments", "experiment"):
             self.btn_duplicate.setToolTip("Duplicate currently selected experiment")
         elif self.mode == "components":
@@ -327,10 +313,29 @@ class ConfigTreeWidget(QWidget):
         if self.current_rel_path:
             self.select_file(self.current_rel_path)
 
+    def _tool_button(self, icon_name, text=None):
+        """Square header button with a themed SVG icon; text, if any, becomes its accessible name."""
+        button = QToolButton()
+        button.setProperty("svg_icon", icon_name)
+        button.setIcon(svg_icon(icon_name, TOOL_ICON_COLORS))
+        button.setIconSize(QSize(16, 16))
+        button.setFixedSize(30, 30)
+        button.setStyleSheet("padding: 0;")
+        if text:
+            button.setAccessibleName(text)
+        return button
+
+    def refresh_icons(self):
+        """Re-render the header icons in the current theme's colors."""
+        for button in self.findChildren(QToolButton):
+            name = button.property("svg_icon")
+            if name:
+                button.setIcon(svg_icon(name, TOOL_ICON_COLORS))
+
     def _add_dir_node(self, parent_widget, dir_path: Path, expand=False, expanded_set=None, has_previous_state=False):
         name = dir_path.name
-        icon = FOLDER_ICONS.get(name, "📁")
-        node = QTreeWidgetItem(parent_widget, [f"{icon}  {name}"])
+        node = QTreeWidgetItem(parent_widget, [name])
+        node.setIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon))
         rel_path = str(dir_path.relative_to(self.root_dir)).replace("\\", "/").strip("/")
         node.setData(0, Qt.ItemDataRole.UserRole, {
             "type": "dir",
@@ -366,7 +371,8 @@ class ConfigTreeWidget(QWidget):
         rel_path = str(file_path.relative_to(self.root_dir))
         is_exp = rel_path.startswith("experiment/") and not name.startswith("_")
 
-        node = QTreeWidgetItem(parent_node, [f"📄  {name}"])
+        node = QTreeWidgetItem(parent_node, [name])
+        node.setIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
         node.setData(0, Qt.ItemDataRole.UserRole, {
             "type": "file",
             "path": str(file_path),
