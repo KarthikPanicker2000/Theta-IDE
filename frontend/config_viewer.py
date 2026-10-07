@@ -26,6 +26,8 @@ from PyQt6.QtWidgets import (
 )
 
 from .config_model import ConfigTree
+from .config_model import add_method as add_method_to
+from .config_model import remove_method as remove_method_from
 from .widgets import ComboBox, DoubleSpinBox, SpinBox, label
 
 # Forms stay readable on wide windows: the column of boxes stops growing past CONTENT_WIDTH,
@@ -75,6 +77,22 @@ def config_tree():
         except (FileNotFoundError, OSError):
             _CONFIG_TREE = None
     return _CONFIG_TREE
+
+
+def _leading_directives(text):
+    """The comment block a config opens with, kept verbatim across a save.
+
+    "# @package _global_" is a Hydra directive, not decoration: without it the
+    file's keys are not applied at the global package level, so methods and the
+    rest simply are not seen. Every one of the experiment configs starts with
+    it, and yaml.safe_dump drops comments, so it has to be re-attached by hand.
+    """
+    kept = []
+    for line in text.splitlines(keepends=True):
+        if line.strip() and not line.lstrip().startswith("#"):
+            break
+        kept.append(line)
+    return "".join(kept)
 
 
 def _read_group_base(tree, group):
@@ -136,6 +154,7 @@ class ConfigViewer(QWidget):
         self.is_dirty = False
         self._block_updates = False
         self.field_widgets = {}
+        self._preamble = ""
 
         self._init_ui()
 
@@ -192,6 +211,7 @@ class ConfigViewer(QWidget):
 
         try:
             content = self.current_path.read_text(encoding="utf-8")
+            self._preamble = _leading_directives(content)
             data = yaml.safe_load(content) or {}
             self.raw_data = data if isinstance(data, dict) else {"content": data}
         except Exception as exc:
@@ -502,8 +522,15 @@ class ConfigViewer(QWidget):
                 sc_layout = QFormLayout(sub_card)
                 sc_layout.setVerticalSpacing(8)
 
-                title_lbl = label(f"Method: {m_name}", "cardTitle")
-                sc_layout.addRow(title_lbl)
+                title_row = QHBoxLayout()
+                title_row.addWidget(label(f"Method: {m_name}", "cardTitle"))
+                title_row.addStretch()
+                btn_remove = QToolButton()
+                btn_remove.setText("Remove")
+                btn_remove.setToolTip(f"Remove method '{m_name}' from this experiment")
+                btn_remove.clicked.connect(lambda _, mn=m_name: self.remove_method(mn))
+                title_row.addWidget(btn_remove)
+                sc_layout.addRow(title_row)
 
                 # Agent — restricted to what this paradigm permits
                 agent_val = str(m_spec.get("agent", ""))
@@ -594,6 +621,24 @@ class ConfigViewer(QWidget):
                         sc_layout.addRow(extra_k, line_extra)
 
                 m_layout.addWidget(sub_card)
+
+        # Adding a method is how an experiment becomes a comparison, and 17 of
+        # the 46 experiments configure more than one.
+        add_row = QHBoxLayout()
+        add_row.addWidget(label("Add method:", "muted"))
+        self.combo_new_method = ComboBox()
+        permitted_agents = [a.name for a in tree.agents_for(paradigm)] if tree and paradigm in tree.paradigms else []
+        self.combo_new_method.addItems(permitted_agents)
+        self.combo_new_method.setToolTip(f"Agents permitted by {paradigm}")
+        add_row.addWidget(self.combo_new_method)
+        self.btn_add_method = QPushButton("Add")
+        self.btn_add_method.setEnabled(bool(permitted_agents))
+        if not permitted_agents:
+            self.btn_add_method.setToolTip(f"{paradigm} declares no allowed agents")
+        self.btn_add_method.clicked.connect(self.add_method)
+        add_row.addWidget(self.btn_add_method)
+        add_row.addStretch()
+        m_layout.addLayout(add_row)
 
         box_methods.add_layout(m_layout)
         self.boxes_layout.addWidget(box_methods)
@@ -725,6 +770,24 @@ class ConfigViewer(QWidget):
         self.raw_data[key] = value
         self._mark_dirty()
 
+    def add_method(self, agent=None, model="dnn"):
+        """Add a method to the open experiment. Returns its name, or None."""
+        agent = agent or (self.combo_new_method.currentText() if hasattr(self, "combo_new_method") else "")
+        if not agent:
+            return None
+        name = add_method_to(self.raw_data, agent, model)
+        self._mark_dirty()
+        self._render_boxes()
+        return name
+
+    def remove_method(self, name):
+        """Remove a method from the open experiment. Returns True if it went."""
+        if not remove_method_from(self.raw_data, name):
+            return False
+        self._mark_dirty()
+        self._render_boxes()
+        return True
+
     def _on_paradigm_changed(self, value):
         if self._block_updates:
             return
@@ -788,7 +851,7 @@ class ConfigViewer(QWidget):
             return False
         try:
             yaml_str = yaml.safe_dump(self.raw_data, sort_keys=False)
-            self.current_path.write_text(yaml_str, encoding="utf-8")
+            self.current_path.write_text(self._preamble + yaml_str, encoding="utf-8")
             self.is_dirty = False
             self._update_dirty_ui()
             self.save_requested.emit()

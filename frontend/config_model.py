@@ -378,6 +378,48 @@ class Selection:
         return " ".join(self.command(**kwargs))
 
 
+def unique_method_name(existing: Any, agent: str, model: str) -> str:
+    """A method name free in `existing`, following the <agent>_<model> convention.
+
+    The configs name methods after the agent they run, sometimes with a suffix
+    (ppo_dnn, ppo_blendrl, iql_blendrl_arch1), so a collision gets a numeric
+    suffix rather than a new scheme.
+    """
+    base = f"{agent}_{model}" if model else str(agent)
+    taken = set(existing or ())
+    if base not in taken:
+        return base
+    n = 2
+    while f"{base}_{n}" in taken:
+        n += 1
+    return f"{base}_{n}"
+
+
+def add_method(data: dict[str, Any], agent: str, model: str = "dnn") -> str:
+    """Add a method to an experiment's `methods` block. Returns its name."""
+    methods = data.setdefault("methods", {})
+    name = unique_method_name(methods, agent, model)
+    methods[name] = {"agent": agent, "model": model}
+    return name
+
+
+def remove_method(data: dict[str, Any], name: str) -> bool:
+    """Drop a method. Returns False if it was not there.
+
+    `params` holds settings shared by every method rather than a method of its
+    own, so it is never removable this way.
+    """
+    methods = data.get("methods")
+    if not isinstance(methods, dict) or name == "params" or name not in methods:
+        return False
+    del methods[name]
+    if not [k for k in methods if k != "params"]:
+        # A methods block with only `params` left satisfies no paradigm, and an
+        # absent one lets the group base supply its own.
+        data.pop("methods", None)
+    return True
+
+
 def deletion_blocked_reason(path: Path) -> str | None:
     """Why deleting this config would break something, or None if it is safe.
 

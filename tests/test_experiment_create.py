@@ -11,7 +11,15 @@ from pathlib import Path
 
 import yaml
 
-from frontend.config_model import ConfigTree, ExperimentGroup, experiment_yaml, group_base_yaml
+from frontend.config_model import (
+    ConfigTree,
+    ExperimentGroup,
+    add_method,
+    experiment_yaml,
+    group_base_yaml,
+    remove_method,
+    unique_method_name,
+)
 
 
 def parse(text):
@@ -167,6 +175,70 @@ class TestGeneratedExperimentsMatchParadigmRules(unittest.TestCase):
                     self.assertNotIn(field, data, f"{name} ({group.paradigm}) wrote forbidden {field}")
             checked += 1
         self.assertGreater(checked, 5, "expected several groups to declare a paradigm")
+
+
+class TestMethodEditing(unittest.TestCase):
+    """Adding a second method is how an experiment becomes a comparison; 17 of
+    the 46 experiments configure more than one."""
+
+    def test_add_uses_the_agent_model_naming_convention(self):
+        data = {}
+        self.assertEqual(add_method(data, "ppo", "dnn"), "ppo_dnn")
+
+    def test_add_writes_agent_and_model(self):
+        data = {}
+        name = add_method(data, "cql", "blendrl")
+        self.assertEqual(data["methods"][name], {"agent": "cql", "model": "blendrl"})
+
+    def test_add_creates_the_methods_block_when_absent(self):
+        data = {"seed": 1}
+        add_method(data, "ppo", "dnn")
+        self.assertIn("methods", data)
+
+    def test_add_keeps_existing_methods(self):
+        data = {"methods": {"ppo_dnn": {"agent": "ppo", "model": "dnn"}}}
+        add_method(data, "iql", "dnn")
+        self.assertEqual(sorted(data["methods"]), ["iql_dnn", "ppo_dnn"])
+
+    def test_a_repeated_pairing_gets_a_suffix(self):
+        data = {}
+        first = add_method(data, "ppo", "dnn")
+        second = add_method(data, "ppo", "dnn")
+        self.assertNotEqual(first, second)
+        self.assertEqual(second, "ppo_dnn_2")
+
+    def test_suffixes_keep_climbing(self):
+        data = {}
+        for _ in range(3):
+            add_method(data, "ppo", "dnn")
+        self.assertIn("ppo_dnn_3", data["methods"])
+
+    def test_unique_name_respects_names_already_taken(self):
+        self.assertEqual(unique_method_name({"ppo_dnn"}, "ppo", "dnn"), "ppo_dnn_2")
+
+    def test_remove_drops_only_the_named_method(self):
+        data = {"methods": {"a": {"agent": "ppo"}, "b": {"agent": "iql"}}}
+        self.assertTrue(remove_method(data, "a"))
+        self.assertEqual(list(data["methods"]), ["b"])
+
+    def test_remove_reports_an_unknown_method(self):
+        self.assertFalse(remove_method({"methods": {}}, "nope"))
+
+    def test_params_is_shared_settings_not_a_removable_method(self):
+        data = {"methods": {"params": {"lr": 1}, "a": {"agent": "ppo"}}}
+        self.assertFalse(remove_method(data, "params"))
+        self.assertIn("params", data["methods"])
+
+    def test_removing_the_last_method_drops_the_block(self):
+        """An empty methods block satisfies no paradigm; absent lets the base supply one."""
+        data = {"methods": {"a": {"agent": "ppo"}}}
+        remove_method(data, "a")
+        self.assertNotIn("methods", data)
+
+    def test_a_block_left_with_only_params_is_also_dropped(self):
+        data = {"methods": {"params": {"lr": 1}, "a": {"agent": "ppo"}}}
+        remove_method(data, "a")
+        self.assertNotIn("methods", data)
 
 
 class TestParadigmInheritance(unittest.TestCase):

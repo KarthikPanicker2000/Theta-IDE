@@ -378,5 +378,69 @@ class TestScrollDoesNotEditFields(unittest.TestCase):
             self.assertEqual(widget.focusPolicy(), self.Qt.FocusPolicy.StrongFocus, name)
 
 
+@unittest.skipIf(not HAS_PYQT6, "PyQt6 not installed in current environment")
+class TestSavePreservesHydraDirectives(unittest.TestCase):
+    """yaml.safe_dump drops comments, and "# @package _global_" is a Hydra
+    directive rather than one. Losing it stopped the file's keys being applied
+    globally, so a single edit through the panel made the experiment invalid:
+    "requires 'methods' to satisfy rule 'non_empty'". All 67 configs carry it."""
+
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = Path(self.tmp.name) / "exp.yaml"
+        self.path.write_text(
+            "# @package _global_\n"
+            "# a second note\n"
+            "defaults:\n  - mimic/_base\n\n"
+            "experiment_id: demo\nseed: 42\n"
+            "methods:\n  cql_dnn:\n    agent: cql\n    model: dnn\n"
+        )
+        self.viewer = ConfigViewer()
+        self.addCleanup(self.viewer.close)
+        self.viewer.load_file(self.path, "experiment/mimic/exp.yaml")
+
+    def test_package_directive_survives_a_save(self):
+        self.viewer.spin_seed.setValue(43)
+        self.viewer.save_to_disk()
+        self.assertTrue(self.path.read_text().startswith("# @package _global_"))
+
+    def test_the_whole_leading_comment_block_survives(self):
+        self.viewer.save_to_disk()
+        self.assertIn("# a second note", self.path.read_text())
+
+    def test_the_edit_is_still_written(self):
+        import yaml
+
+        self.viewer.spin_seed.setValue(43)
+        self.viewer.save_to_disk()
+        self.assertEqual(yaml.safe_load(self.path.read_text())["seed"], 43)
+
+    def test_methods_survive_a_save(self):
+        import yaml
+
+        self.viewer.save_to_disk()
+        self.assertIn("cql_dnn", yaml.safe_load(self.path.read_text())["methods"])
+
+    def test_repeated_saves_do_not_stack_the_preamble(self):
+        for _ in range(3):
+            self.viewer.save_to_disk()
+        self.assertEqual(self.path.read_text().count("# @package _global_"), 1)
+
+    def test_a_file_without_a_preamble_is_unharmed(self):
+        from pathlib import Path
+
+        plain = Path(self.tmp.name) / "plain.yaml"
+        plain.write_text("seed: 1\n")
+        viewer = ConfigViewer()
+        self.addCleanup(viewer.close)
+        viewer.load_file(plain, "experiment/mimic/plain.yaml")
+        viewer.save_to_disk()
+        self.assertFalse(plain.read_text().startswith("#"))
+
+
 if __name__ == "__main__":
     unittest.main()
