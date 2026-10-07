@@ -10,6 +10,7 @@ selection turns into.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
@@ -375,3 +376,39 @@ class Selection:
 
     def command_line(self, **kwargs: Any) -> str:
         return " ".join(self.command(**kwargs))
+
+
+def deletion_blocked_reason(path: Path) -> str | None:
+    """Why deleting this config would break something, or None if it is safe.
+
+    A group's _base.yaml binds the environment and paradigm every experiment in
+    the group inherits. Removing one while experiments remain leaves them
+    pointing at nothing, and Hydra cannot even load the result:
+    "Could not load 'experiment/<group>/_base'".
+    """
+    path = Path(path)
+    if not path.exists():
+        return f"{path.name} no longer exists"
+    if path.name != "_base.yaml":
+        return None
+    siblings = [p for p in path.parent.glob("*.yaml") if p.name != "_base.yaml"]
+    if siblings:
+        names = ", ".join(sorted(p.stem for p in siblings)[:4])
+        return (
+            f"{path.parent.name}/_base.yaml defines the environment and paradigm for "
+            f"{len(siblings)} experiment(s) that inherit it ({names}). "
+            f"Delete those first."
+        )
+    return None
+
+
+def rename_experiment_text(text: str, new_id: str) -> str:
+    """The file's contents with experiment_id updated to match a new filename.
+
+    Rewriting the one line rather than round-tripping through yaml keeps the
+    comments and key order the rest of the team wrote.
+    """
+    pattern = re.compile(r"^(\s*experiment_id\s*:\s*).*$", re.MULTILINE)
+    if pattern.search(text):
+        return pattern.sub(lambda m: f"{m.group(1)}{new_id}", text, count=1)
+    return text

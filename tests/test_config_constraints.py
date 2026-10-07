@@ -26,6 +26,22 @@ except ImportError:
     HAS_PYQT6 = False
 
 
+def an_experiment_in(group):
+    """Any experiment in `group`, as (path, rel_path).
+
+    Naming a specific file would tie these tests to the config tree staying
+    still, and it does not: a reorganisation took it from 85 experiments to 68
+    and deleted the one these tests used to open.
+    """
+    from pathlib import Path
+
+    directory = Path("in/config/experiment") / group
+    for path in sorted(directory.glob("*.yaml")):
+        if not path.name.startswith("_"):
+            return path, f"experiment/{group}/{path.name}"
+    raise AssertionError(f"no experiment configs left in {directory}")
+
+
 ONLINE_EXPERIMENT = (
     "paradigm: online_rl\n"
     "experiment_id: cp_demo\n"
@@ -233,40 +249,39 @@ class TestInheritedValuesAreVisible(unittest.TestCase):
     """A disabled field showed the widget default, which is not the value the run
     uses, and "(inherit from base)" never said what was inherited."""
 
-    def viewer(self, rel):
-        from pathlib import Path
-
+    def viewer(self, group):
+        path, rel = an_experiment_in(group)
         v = ConfigViewer()
         self.addCleanup(v.close)
-        v.load_file(Path("in/config/experiment") / rel, f"experiment/{rel}")
+        v.load_file(path, rel)
         return v
 
     def test_inherit_option_names_the_environment(self):
-        self.assertEqual(self.viewer("mimic/all_mimic.yaml").combo_env.itemText(0),
+        self.assertEqual(self.viewer("mimic").combo_env.itemText(0),
                          "(inherit from base — mimic)")
 
     def test_inherit_option_keeps_the_sentinel_in_item_data(self):
-        self.assertEqual(self.viewer("mimic/all_mimic.yaml").combo_env.itemData(0), ConfigViewer.INHERIT)
+        self.assertEqual(self.viewer("mimic").combo_env.itemData(0), ConfigViewer.INHERIT)
 
     def test_env_selection_is_none_while_inherited(self):
-        self.assertIsNone(self.viewer("mimic/all_mimic.yaml").env_selection())
+        self.assertIsNone(self.viewer("mimic").env_selection())
 
     def test_env_selection_reports_an_explicit_choice(self):
-        viewer = self.viewer("mimic/all_mimic.yaml")
+        viewer = self.viewer("mimic")
         viewer.combo_env.setCurrentText("pyrenees")
         self.assertEqual(viewer.env_selection(), "pyrenees")
 
     def test_disabled_field_shows_the_value_the_base_pins(self):
-        viewer = self.viewer("mimic/all_mimic.yaml")
+        viewer = self.viewer("mimic")
         self.assertEqual(viewer.spin_intervals.value(), 1)
         self.assertEqual(viewer.spin_eval_ep.value(), 0)
 
     def test_disabled_field_says_where_the_value_came_from(self):
-        viewer = self.viewer("mimic/all_mimic.yaml")
+        viewer = self.viewer("mimic")
         self.assertIn("offline_rl", viewer.spin_intervals.suffix())
 
     def test_enabled_fields_carry_no_suffix(self):
-        viewer = self.viewer("cartpole/quick_test.yaml")
+        viewer = self.viewer("cartpole")
         self.assertEqual(viewer.spin_intervals.suffix(), "")
         self.assertEqual(viewer.spin_eval_ep.suffix(), "")
 
@@ -310,7 +325,7 @@ class TestScrollDoesNotEditFields(unittest.TestCase):
         self.viewer = ConfigViewer()
         self.addCleanup(self.viewer.close)
         self.viewer.load_file(
-            Path("in/config/experiment/cartpole/quick_test.yaml"), "experiment/cartpole/quick_test.yaml"
+            *an_experiment_in("cartpole")
         )
         self.viewer.show()
         QApplication.processEvents()

@@ -24,7 +24,13 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from .config_model import ConfigTree, experiment_yaml, group_base_yaml
+from .config_model import (
+    ConfigTree,
+    deletion_blocked_reason,
+    experiment_yaml,
+    group_base_yaml,
+    rename_experiment_text,
+)
 from .sidetabs import svg_icon
 from .widgets import label
 
@@ -579,6 +585,77 @@ class ConfigTreeWidget(QWidget):
         except OSError as exc:
             QMessageBox.critical(self, "Duplicate Error", f"Could not duplicate file:\n{exc}")
 
+    def delete_config(self, rel_path):
+        """Delete a config file. Returns (removed, error).
+
+        Opens no dialogs: a modal message box blocks forever when nobody is
+        there to dismiss it, so the caller reports the error instead.
+        """
+        path = self.root_dir / rel_path
+        blocked = deletion_blocked_reason(path)
+        if blocked:
+            return False, blocked
+        try:
+            path.unlink()
+        except OSError as exc:
+            return False, str(exc)
+        if self.current_rel_path == rel_path:
+            self.current_rel_path = None
+        self.populate()
+        return True, None
+
+    def rename_config(self, rel_path, new_name):
+        """Rename a config, keeping experiment_id in step. Returns (new_rel, error)."""
+        path = self.root_dir / rel_path
+        new_name = (new_name or "").strip()
+        if not new_name:
+            return None, "Give the file a name."
+        if not new_name.endswith(".yaml"):
+            new_name += ".yaml"
+        target = path.parent / new_name
+        if target == path:
+            return rel_path, None
+        if target.exists():
+            return None, f"{new_name} already exists in this folder."
+        try:
+            text = path.read_text(encoding="utf-8")
+            path.rename(target)
+            target.write_text(rename_experiment_text(text, target.stem), encoding="utf-8")
+        except OSError as exc:
+            return None, str(exc)
+        new_rel = str(Path(rel_path).parent / new_name)
+        self.populate()
+        self.select_file(new_rel)
+        return new_rel, None
+
+    def prompt_delete(self, rel_path):
+        blocked = deletion_blocked_reason(self.root_dir / rel_path)
+        if blocked:
+            QMessageBox.warning(self, "Cannot delete", blocked)
+            return
+        answer = QMessageBox.question(
+            self, "Delete config",
+            f"Delete {rel_path}?\n\nThis file is tracked in git; deleting it here "
+            f"removes it from your working tree.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        removed, error = self.delete_config(rel_path)
+        if not removed:
+            QMessageBox.critical(self, "Delete failed", error or "Unknown error")
+
+    def prompt_rename(self, rel_path):
+        current = Path(rel_path).stem
+        name, ok = QInputDialog.getText(
+            self, "Rename", f"New name for '{current}':", QLineEdit.EchoMode.Normal, current
+        )
+        if ok:
+            _, error = self.rename_config(rel_path, name)
+            if error:
+                QMessageBox.warning(self, "Rename failed", error)
+
     def _show_context_menu(self, position):
         item = self.tree.itemAt(position)
         if not item:
@@ -594,6 +671,11 @@ class ConfigTreeWidget(QWidget):
             label_dup = "Duplicate Experiment…" if self.mode in ("experiments", "experiment") else "Duplicate Config…"
             action_dup = menu.addAction(label_dup)
             action_dup.triggered.connect(self.prompt_duplicate)
+            rel = data["rel_path"]
+            action_rename = menu.addAction("Rename…")
+            action_rename.triggered.connect(lambda: self.prompt_rename(rel))
+            action_delete = menu.addAction("Delete…")
+            action_delete.triggered.connect(lambda: self.prompt_delete(rel))
         elif data["type"] == "dir":
             rel = data["rel_path"]
             if rel.startswith("experiment") or self.mode in ("experiments", "experiment"):
