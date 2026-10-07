@@ -99,7 +99,7 @@ class Experiment:
     def from_file(cls, path: Path, root: Path) -> Experiment:
         relative = path.relative_to(root)
         return cls(
-            name=str(relative.with_suffix("")),
+            name=relative.with_suffix("").as_posix(),
             group=relative.parent.name or "ungrouped",
             path=path,
             raw=_read_yaml(path),

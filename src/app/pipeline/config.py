@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any, cast
 
 import yaml
 
@@ -22,6 +23,13 @@ def parse_method_list(val):
     if hasattr(val, "__iter__") and not isinstance(val, str):
         return list(val)
     return [item.strip() for item in str(val).split(",") if item.strip()]
+
+
+def _config_to_dict(cfg: Any) -> dict[str, Any]:
+    """Resolve a DictConfig into a plain dict (OmegaConf types its result as a broad union)."""
+    from omegaconf import OmegaConf
+
+    return cast(dict[str, Any], OmegaConf.to_container(cfg, resolve=True))
 
 
 _RESERVED_METHOD_KEYS = {
@@ -358,21 +366,21 @@ def parse_methods_dict(cfg) -> dict[str, dict]:
         return {}
 
     if isinstance(raw_methods, DictConfig):
-        raw_methods_dict = OmegaConf.to_container(raw_methods, resolve=True)
+        raw_methods_dict = _config_to_dict(raw_methods)
     elif hasattr(raw_methods, "items"):
         raw_methods_dict = dict(raw_methods)
     else:
         return {}
 
     # 1. Extract shared params from top-level config (e.g. cfg.params)
-    top_params = {}
+    top_params: dict[str, Any] = {}
     for top_key in ("params", "shared_params", "common_params"):
         val = getattr(cfg, top_key, None) if not isinstance(cfg, dict) else cfg.get(top_key)
         if val is None and hasattr(cfg, "get"):
             val = cfg.get(top_key, None)
         if val:
             if isinstance(val, DictConfig):
-                val_dict = OmegaConf.to_container(val, resolve=True)
+                val_dict = _config_to_dict(val)
             elif hasattr(val, "items"):
                 val_dict = dict(val)
             else:
@@ -380,12 +388,12 @@ def parse_methods_dict(cfg) -> dict[str, dict]:
             top_params = deep_merge(top_params, val_dict)
 
     # 2. Extract shared params from within methods dict (e.g. methods.params)
-    method_level_params = {}
+    method_level_params: dict[str, Any] = {}
     for res_key in _RESERVED_METHOD_KEYS:
         if res_key in raw_methods_dict:
             res_val = raw_methods_dict[res_key]
             if isinstance(res_val, DictConfig):
-                res_dict = OmegaConf.to_container(res_val, resolve=True)
+                res_dict = _config_to_dict(res_val)
             elif isinstance(res_val, dict):
                 res_dict = dict(res_val)
             else:
@@ -399,7 +407,7 @@ def parse_methods_dict(cfg) -> dict[str, dict]:
     shared_model = shared_params.get("model", {})
 
     # Extract shared tuning search space
-    shared_tune = {}
+    shared_tune: dict[str, Any] = {}
     for tune_key in ("tune", "search_space"):
         if tune_key in shared_params and isinstance(shared_params[tune_key], dict):
             shared_tune = deep_merge(shared_tune, shared_params[tune_key])
@@ -458,7 +466,7 @@ def parse_methods_dict(cfg) -> dict[str, dict]:
             continue
 
         if isinstance(method_cfg, DictConfig):
-            m_dict = OmegaConf.to_container(method_cfg, resolve=True)
+            m_dict = _config_to_dict(method_cfg)
         elif isinstance(method_cfg, dict):
             m_dict = dict(method_cfg)
         else:

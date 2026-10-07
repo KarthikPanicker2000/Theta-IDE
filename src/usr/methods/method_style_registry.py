@@ -189,7 +189,7 @@ def get_style(name: str, style_override: dict | None = None) -> dict:
     normalized = raw.replace("/", "_")
     canon = get_canonical_method_name(normalized)
 
-    base = None
+    base: dict[str, str | None] | None = None
     for cand in [canon, normalized, raw]:
         if cand in METHOD_STYLE:
             base = dict(METHOD_STYLE[cand])

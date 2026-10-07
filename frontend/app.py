@@ -496,9 +496,9 @@ class Window(QMainWindow):
         self.active_config_rel_path = rel_path
         self.config_viewer.load_file(file_path, rel_path)
 
-        norm_rel = str(Path(rel_path)).replace("\\", "/")
+        norm_rel = Path(rel_path).as_posix()
         if norm_rel.startswith("experiment/") and not Path(rel_path).name.startswith("_"):
-            exp_name = str(Path(norm_rel).relative_to("experiment").with_suffix(""))
+            exp_name = Path(norm_rel).relative_to("experiment").with_suffix("").as_posix()
             self.current_experiment = exp_name
             self.start_button.setEnabled(self.compose_valid)
             self.queue_button.setEnabled(self.compose_valid)
@@ -669,8 +669,9 @@ class Window(QMainWindow):
             "Sidebar auto-hide on: hover the left edge to show it." if enabled else "Sidebar docked.", 4000)
 
     def on_pane_slider_toggled(self, pane_id, checked):
-        visible_count = sum(1 for s in self.pane_sliders.values() if s.isChecked())
-        if not checked and visible_count == 0:
+        # Count the other panes, so the guard holds whether or not this slider has already flipped
+        others_visible = sum(1 for pid, s in self.pane_sliders.items() if pid != pane_id and s.isChecked())
+        if not checked and others_visible == 0:
             slider = self.pane_sliders.get(pane_id)
             if slider:
                 slider.blockSignals(True)

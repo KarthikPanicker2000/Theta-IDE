@@ -100,6 +100,7 @@ class TestTerminalReloader(unittest.TestCase):
         self.assertEqual(len(emitted), 1)
         reloader.stop()
 
+    @unittest.skipIf(sys.platform == "win32", "select() on pipes is POSIX-only; Windows uses the msvcrt listener")
     def test_posix_listener_with_pipe_ctrl_r(self):
         """Simulate Ctrl+R arriving on stdin pipe."""
         r_fd, w_fd = os.pipe()
@@ -129,6 +130,7 @@ class TestTerminalReloader(unittest.TestCase):
         os.close(r_fd)
         reloader.stop()
 
+    @unittest.skipIf(sys.platform == "win32", "select() on pipes is POSIX-only; Windows uses the msvcrt listener")
     def test_posix_listener_with_pipe_ctrl_c(self):
         """Simulate Ctrl+C arriving on stdin pipe."""
         r_fd, w_fd = os.pipe()
@@ -156,6 +158,7 @@ class TestTerminalReloader(unittest.TestCase):
         os.close(r_fd)
         reloader.stop()
 
+    @unittest.skipIf(sys.platform == "win32", "select() on pipes is POSIX-only; Windows uses the msvcrt listener")
     def test_posix_listener_with_normal_input_ignored(self):
         """Simulate normal typing (e.g. 'hello') on stdin pipe without reload."""
         r_fd, w_fd = os.pipe()

@@ -7,6 +7,7 @@ Concrete implementations live in src/core/paradigm_impls/.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 
 class BaseDataModule(ABC):

@@ -137,10 +137,14 @@ class TestWindowLayoutAndSliders(unittest.TestCase):
             self.assertIn(pane_id, self.window.pane_sliders)
             slider = self.window.pane_sliders[pane_id]
             self.assertIsInstance(slider, ToggleSlider)
-            self.assertTrue(slider.isChecked())
+            # Sliders start in step with the default sidebar visibility in settings.toml
+            self.assertEqual(slider.isChecked(), pane_id in self.window.settings_manager.sidebar_visible)
 
     def test_toggle_slider_hides_pane(self):
+        # Plots is hidden by default, so show it first
+        self.window.pane_sliders["plots"].setChecked(True)
         self.assertTrue(self.window.tabs.is_tab_visible("plots"))
+
         # Toggle plots off
         self.window.pane_sliders["plots"].setChecked(False)
         self.assertFalse(self.window.tabs.is_tab_visible("plots"))

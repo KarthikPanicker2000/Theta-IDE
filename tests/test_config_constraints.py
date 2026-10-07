@@ -266,7 +266,7 @@ class TestInheritedValuesAreVisible(unittest.TestCase):
         self.assertIn("offline_rl", viewer.spin_intervals.suffix())
 
     def test_enabled_fields_carry_no_suffix(self):
-        viewer = self.viewer("cartpole/blending.yaml")
+        viewer = self.viewer("cartpole/quick_test.yaml")
         self.assertEqual(viewer.spin_intervals.suffix(), "")
         self.assertEqual(viewer.spin_eval_ep.suffix(), "")
 
@@ -310,7 +310,7 @@ class TestScrollDoesNotEditFields(unittest.TestCase):
         self.viewer = ConfigViewer()
         self.addCleanup(self.viewer.close)
         self.viewer.load_file(
-            Path("in/config/experiment/cartpole/blending.yaml"), "experiment/cartpole/blending.yaml"
+            Path("in/config/experiment/cartpole/quick_test.yaml"), "experiment/cartpole/quick_test.yaml"
         )
         self.viewer.show()
         QApplication.processEvents()

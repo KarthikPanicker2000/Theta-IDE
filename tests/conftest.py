@@ -33,6 +33,29 @@ except ImportError:
     pass
 
 
+@pytest.fixture(autouse=True)
+def _delete_leftover_widgets():
+    """Free the windows a test leaves behind.
+
+    close() only hides a widget, and deleteLater() is not honoured without a
+    running event loop, so every Window a test builds (~800 widgets) used to
+    live until the session ended. app.setStyleSheet() restyles every live
+    widget, so each new Window got slower until GUI tests hit the timeout.
+    """
+    yield
+    if "PyQt6.QtWidgets" not in sys.modules:
+        return
+    from PyQt6.QtCore import QEvent
+    from PyQt6.QtWidgets import QApplication
+
+    app = QApplication.instance()
+    if app is None:
+        return
+    for widget in app.topLevelWidgets():
+        widget.deleteLater()
+    QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete.value)
+
+
 @pytest.fixture
 def project_root():
     """Return the project root directory."""

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 log = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ def load_workflow(workflow_ref: Any):
             if isinstance(workflow_ref, DictConfig)
             else workflow_ref
         )
-        return WorkflowGraph.from_dict(data)
+        return WorkflowGraph.from_dict(cast(dict[str, Any], data))
 
     workflow_id = str(workflow_ref)
     yaml_path = _WORKFLOW_CONFIG_DIR / f"{workflow_id}.yaml"

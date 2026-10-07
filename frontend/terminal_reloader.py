@@ -58,11 +58,19 @@ def build_reload_command(
     return cmd
 
 
+def _stdin_fd() -> int:
+    """File descriptor of stdin, or 0 when stdin has been replaced (e.g. by pytest's capture)."""
+    try:
+        return sys.stdin.fileno()
+    except (AttributeError, OSError, ValueError):
+        return 0
+
+
 class TerminalManager:
     """Manages terminal raw/cbreak mode on POSIX systems with safe cleanup."""
 
     def __init__(self, fd: Optional[int] = None) -> None:
-        self.fd = fd if fd is not None else (sys.stdin.fileno() if hasattr(sys.stdin, "fileno") else 0)
+        self.fd = fd if fd is not None else _stdin_fd()
         self._old_settings = None
         self._is_cbreak = False
         self._lock = threading.Lock()

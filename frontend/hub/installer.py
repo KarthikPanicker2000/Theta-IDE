@@ -2,6 +2,7 @@
 from __future__ import annotations
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import tempfile
@@ -92,6 +93,8 @@ class HubInstaller:
     ) -> Path:
         """Download an archive and verify its cryptographic SHA-256 checksum."""
         tmp_fd, tmp_path_str = tempfile.mkstemp(prefix="theta_pkg_", suffix=".zip")
+        # Writes below reopen the file by path; an open handle would also block unlink() on Windows
+        os.close(tmp_fd)
         tmp_path = Path(tmp_path_str)
 
         hasher = hashlib.sha256()

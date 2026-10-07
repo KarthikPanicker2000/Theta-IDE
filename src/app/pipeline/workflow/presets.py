@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from .model import Port, PortDirection, PortType, WorkflowGraph, WorkflowNode
 from .templates import (
     make_dataset_source_node,
@@ -137,7 +139,7 @@ def create_sepsis_reciprocal_preset() -> WorkflowGraph:
     return graph
 
 
-BUILTIN_PRESETS: dict[str, callable] = {
+BUILTIN_PRESETS: dict[str, Callable[[], WorkflowGraph]] = {
     "transfer_learning": create_transfer_learning_preset,
     "online_vs_offline": create_online_vs_offline_preset,
     "model_distillation": create_model_distillation_preset,

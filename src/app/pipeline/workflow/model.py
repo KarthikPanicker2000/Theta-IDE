@@ -325,7 +325,7 @@ class WorkflowGraph:
         Handles DAGs and breaks simple feedback loops gracefully.
         """
         in_degree = {nid: 0 for nid in self.nodes}
-        adj = {nid: set() for nid in self.nodes}
+        adj: dict[str, set[str]] = {nid: set() for nid in self.nodes}
 
         for wire in self.strings:
             if wire.source_node_id in self.nodes and wire.target_node_id in self.nodes:
@@ -364,7 +364,7 @@ class WorkflowGraph:
         }
 
     def to_yaml(self) -> str:
-        return yaml.dump(self.to_dict(), sort_keys=False)
+        return str(yaml.dump(self.to_dict(), sort_keys=False))
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> WorkflowGraph:

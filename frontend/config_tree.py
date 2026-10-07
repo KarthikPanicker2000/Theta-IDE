@@ -368,7 +368,7 @@ class ConfigTreeWidget(QWidget):
 
     def _add_file_node(self, parent_node, file_path: Path):
         name = file_path.name
-        rel_path = str(file_path.relative_to(self.root_dir))
+        rel_path = file_path.relative_to(self.root_dir).as_posix()
         is_exp = rel_path.startswith("experiment/") and not name.startswith("_")
 
         node = QTreeWidgetItem(parent_node, [name])
@@ -574,7 +574,7 @@ class ConfigTreeWidget(QWidget):
 
             target_file.write_text(new_text, encoding="utf-8")
             self.populate()
-            new_rel = str(target_file.relative_to(self.root_dir))
+            new_rel = target_file.relative_to(self.root_dir).as_posix()
             self.select_file(new_rel)
         except OSError as exc:
             QMessageBox.critical(self, "Duplicate Error", f"Could not duplicate file:\n{exc}")
